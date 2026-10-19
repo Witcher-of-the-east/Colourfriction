@@ -41,3 +41,27 @@ npm run preview
 ## Current prototype limits
 
 Media, member profiles, the visitor counter, and the web-ring are sample content. Theme selection, favourite hearts, and guestbook entries persist in this browser using localStorage. This is local-only persistence, not a user account or shared database. Authentication, PostgreSQL, and real TMDB/IGDB/music/book APIs are planned for later phases. Google Fonts are loaded remotely, so the custom typefaces need an internet connection.
+
+
+## Phase 2 — Profile Lab
+
+The Phase 2 starter adds a **MY PROFILE LAB** item to the main navigation. It opens a live profile editor with three tabs:
+
+- **Identity:** display name, username, emoji avatar, status, bio, and web badges.
+- **The vibe:** five colour palettes, four background textures, three font treatments, and two layout styles.
+- **My stuff:** editable favourites for movies, games, music, and books.
+
+Changes update the preview immediately. **Save My Page** stores profile settings in this browser using local storage. This is a local prototype only: it does not publish a public profile, create accounts, sync across devices, or connect to a media catalog. Those require later authentication, database, and API phases.
+
+### Run
+
+```bash
+npm install
+npm run dev
+```
+
+To check the production bundle:
+
+```bash
+npm run build
+```

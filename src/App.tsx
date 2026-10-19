@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import ProfileEditor from './ProfileEditor'
 import {
   ArrowDownRight, ArrowRight, ArrowUpRight, BookOpen, Check, ChevronDown,
   Disc3, Gamepad2, Heart, Menu, Music2, Palette, Search,
@@ -25,6 +26,15 @@ const categoryIcons = {
   movies: Film, games: Gamepad2, music: Music2, series: Tv, books: BookOpen,
 }
 
+const tinyQuests = [
+  'Replay a song that sounds like a specific memory.',
+  'Tell someone why your favourite side character matters.',
+  'Find a film poster with colours you want to live inside.',
+  'Write down one tiny thing you loved this week.',
+  'Recommend something niche to a willing internet pal.',
+  'Take a 5-minute detour into somebody else’s favourite thing.',
+]
+
 const themes = [
   { name: 'grape soda', accent: '#8c5bd6', paper: '#f5f0e7', ink: '#26231f', soft: '#e8defa' },
   { name: 'tomato jam', accent: '#d94d35', paper: '#fff0df', ink: '#34251f', soft: '#ffd7c8' },
@@ -43,6 +53,7 @@ function readStored<T>(key: string, fallback: T): T {
 
 function App() {
   const [category, setCategory] = useState<Category>('all')
+  const [profileMode, setProfileMode] = useState(false)
   const [themeIndex, setThemeIndex] = useState(() => {
     const saved = readStored<number>('theme', 0)
     return Number.isInteger(saved) && saved >= 0 && saved < themes.length ? saved : 0
@@ -57,6 +68,8 @@ function App() {
   const [guestMessage, setGuestMessage] = useState('your site feels like a warm computer')
   const [guestEntries, setGuestEntries] = useState(() => readStored('guestbook', [{ name: 'moth.mp3', message: 'this place has excellent dust particles ✦' }, { name: 'pixel_goblin', message: 'signed the guestbook with my whole heart' }]))
   const [notice, setNotice] = useState('')
+  const [questIndex, setQuestIndex] = useState(() => readStored<number>('tiny-quest', 0) % tinyQuests.length)
+  const [questDone, setQuestDone] = useState(false)
   const theme = themes[themeIndex]
   const filteredPicks = useMemo(() => picks.filter((pick) => category === 'all' || pick.kind === category), [category])
   const searchResults = useMemo(() => picks.filter((pick) => `${pick.title} ${pick.detail} ${pick.kind}`.toLowerCase().includes(searchTerm.toLowerCase())), [searchTerm])
@@ -72,6 +85,9 @@ function App() {
   useEffect(() => {
     try { window.localStorage.setItem('colourfriction:guestbook', JSON.stringify(guestEntries)) } catch { /* storage may be unavailable */ }
   }, [guestEntries])
+  useEffect(() => {
+    try { window.localStorage.setItem('colourfriction:tiny-quest', JSON.stringify(questIndex)) } catch { /* storage may be unavailable */ }
+  }, [questIndex])
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -105,11 +121,12 @@ function App() {
         <a className="nav-active" href="#home"><span>01</span> THE FRONT PAGE</a>
         <a href="#discover"><span>02</span> THE DISCOVERY DESK</a>
         <a href="#community"><span>03</span> PEOPLE-WATCHING</a>
-        <a href="#about"><span>04</span> WHAT IS THIS?</a>
+        <a href="#about" onClick={() => setProfileMode(false)}><span>04</span> WHAT IS THIS?</a>
+        <button className={`profile-nav-button ${profileMode ? 'profile-nav-active' : ''}`} onClick={() => { setProfileMode(true); setMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }) }}><span>05</span> MY PROFILE LAB ↗</button>
         <span className="nav-status"><span className="live-dot" /> ALL SYSTEMS A LITTLE SILLY</span>
       </nav>
 
-      <div className="desktop-layout">
+      {profileMode ? <ProfileEditor onBack={() => { setProfileMode(false); window.scrollTo({ top: 0, behavior: 'smooth' }) }} /> : <div className="desktop-layout">
         <aside className="web-sidebar" aria-label="Personal web sidebar">
           <section className="sidebar-window profile-window"><div className="window-bar"><span>✳ ABOUT THIS PLACE</span><span>_ □ ×</span></div><div className="sidebar-inner"><div className="pixel-avatar">☺</div><h2>hi, internet pal!</h2><p>you have stumbled into my little corner of the web.</p><div className="status-pill"><span className="live-dot" /> SITE UNDER CONSTRUCTION</div><p className="handwritten">please wipe your shoes ♡</p></div></section>
           <section className="sidebar-window"><div className="window-bar"><span>NOW PLAYING</span><span>♫</span></div><div className="now-playing"><div className="cassette"><span>CF MIXTAPE 01</span><div className="cassette-reels"><i /><i /></div><small>side a · feelings</small></div><b>the internet is a mixtape</b><p>currently looping: imaginary soundtracks</p><div className="equalizer"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></div></div></section>
@@ -144,6 +161,13 @@ function App() {
 
         <div className="ticker" aria-label="Site announcement"><div className="ticker-track"><span>WELCOME TO COLOURFRICTION</span><b>✳</b><span>YOUR TASTE IS A PERSONAL ARCHIVE</span><b>✳</b><span>LESS SCROLLING, MORE FEELING</span><b>✳</b><span>WELCOME TO COLOURFRICTION</span><b>✳</b><span>YOUR TASTE IS A PERSONAL ARCHIVE</span><b>✳</b><span>LESS SCROLLING, MORE FEELING</span><b>✳</b></div></div>
 
+        <section className={`tiny-quest-strip ${questDone ? 'quest-complete' : ''}`} aria-label="Tiny internet side quest">
+          <div className="quest-stamp">SIDE<br />QUEST<span>✳</span></div>
+          <div className="quest-copy"><span className="tiny-label">A VERY SMALL ASSIGNMENT FOR YOUR BRAIN</span><p>{questDone ? 'QUEST COMPLETE. PLEASE ACCEPT THIS INVISIBLE GOLD STAR. ★' : tinyQuests[questIndex]}</p><small>{questDone ? 'you made the internet 0.2% more human' : 'no points, no streaks, no productivity guilt.'}</small></div>
+          <div className="quest-actions"><button className="quest-done-button" onClick={() => setQuestDone(!questDone)}>{questDone ? 'UNDO THE MAGIC ↶' : 'I DID THE THING ✓'}</button><button className="quest-next-button" onClick={() => { setQuestIndex((current) => (current + 1 + Math.floor(Math.random() * (tinyQuests.length - 1))) % tinyQuests.length); setQuestDone(false) }}>ANOTHER QUEST ↻</button></div>
+          <span className="quest-sparkle quest-sparkle-one">✧</span><span className="quest-sparkle quest-sparkle-two">✳</span>
+        </section>
+
         <section className="intro-strip" id="about">
           <div className="section-stamp">HELLO, INTERNET!<span>★</span></div>
           <div className="intro-text"><h2>Remember when the web felt like <em>people?</em></h2><p>Colourfriction is a place to make a little home for the stuff you love. Build a page that feels like you, find people with suspiciously similar taste, and leave the endless recommendation machine behind for a bit.</p></div>
@@ -151,7 +175,7 @@ function App() {
         </section>
 
         <section className="discover-section" id="discover">
-          <div className="section-heading"><div><div className="eyebrow"><span className="eyebrow-star">✳</span> THE COMMUNITY SCRAPBOOK</div><h2>Fresh from the <em>brain shelf.</em></h2></div><a href="#community" className="small-link">SEE WHAT PEOPLE LOVE <ArrowUpRight size={14} /></a></div>
+          <div className="section-heading"><div><div className="eyebrow"><span className="eyebrow-star">✳</span> THE COMMUNITY SCRAPBOOK</div><h2>Fresh from the <em>brain shelf.</em></h2></div><div className="discover-actions"><button className="small-link surprise-link" onClick={() => { const pick = picks[Math.floor(Math.random() * picks.length)]; setCategory(pick.kind); setNotice(`THE ORACLE HAS CHOSEN: ${pick.title.toUpperCase()} — go investigate.`); window.setTimeout(() => document.getElementById('discover')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0) }}>SURPRISE ME ✷ <Sparkles size={14} /></button><a href="#community" className="small-link">SEE WHAT PEOPLE LOVE <ArrowUpRight size={14} /></a></div></div>
           <div className="filter-row" role="group" aria-label="Filter media by category">{(['all', 'movies', 'games', 'music', 'series', 'books'] as Category[]).map((item) => <button key={item} onClick={() => setCategory(item)} className={`filter-chip ${category === item ? 'filter-active' : ''}`}>{item === 'all' ? <Sparkles size={13} /> : (() => { const Icon = categoryIcons[item]; return <Icon size={13} /> })()}{categoryNames[item]}</button>)}<span className="filter-count">{filteredPicks.length.toString().padStart(2, '0')} THINGS ON THE TABLE</span></div>
           <div className="media-grid">{filteredPicks.map((pick) => { const originalIndex = picks.indexOf(pick); const Icon = categoryIcons[pick.kind]; return <article className={`media-item media-${pick.kind}`} key={pick.title}><div className="media-art"><img src={pick.image} alt={`${pick.title} artwork`} loading="lazy" onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }} /><span className="media-kind"><Icon size={12} /> {pick.kind}</span><button className={`heart-button ${liked.includes(originalIndex) ? 'is-liked' : ''}`} onClick={() => toggleLike(originalIndex)} aria-label={liked.includes(originalIndex) ? `Unlike ${pick.title}` : `Like ${pick.title}`}><Heart size={15} fill={liked.includes(originalIndex) ? 'currentColor' : 'none'} /></button><span className="art-index">CF / 00{originalIndex + 1}</span></div><div className="media-meta"><div><h3>{pick.title}</h3><p>{pick.detail}</p></div><ArrowUpRight size={15} className="meta-arrow" /></div><span className="media-tag">✳ {pick.tag}</span></article> })}</div>
           <div className="shelf-bottom"><span>THESE ARE DEMO PICKS. YOUR OBSESSIONS GO HERE.</span><a href="#community">BROWSE THE NEIGHBOURHOOD <ArrowRight size={14} /></a></div>
@@ -165,7 +189,7 @@ function App() {
         <section className="join-strip" id="join"><div className="join-star">✳</div><div><span className="tiny-label">THE WEB IS BETTER WITH YOU IN IT</span><h2>Make yourself <em>at home.</em></h2></div><button className="button-primary join-button" onClick={() => setNotice('Account creation is planned for Phase 4. For now, explore the scrapbook and make yourself at home!')}>I'M IN, LET ME IN <ArrowUpRight size={16} /></button><span className="join-sparkle">✧</span></section>
         {notice && <div className="phase-notice" role="status"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss message"><X size={15} /></button></div>}
         </main>
-      </div>
+      </div>}
 
       <footer className="footer"><a className="footer-logo" href="#home">colourfriction<span>✳</span></a><p>MADE OF MANY LITTLE OBSESSIONS. <br />BUILT ON THE INTERNET, NOT THE ALGORITHM.</p><div className="footer-links"><a href="#about">ABOUT</a><a href="#discover">SCRAPBOOK</a><a href="#community">COMMUNITY</a><button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>BACK TO TOP ↑</button></div><span className="footer-copy">© 2026 COLOURFRICTION · A WORK IN PROGRESS</span></footer>
 
