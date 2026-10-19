@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import ProfileEditor from './ProfileEditor'
+import PersonalHomepage from './PersonalHomepage'
 import {
   ArrowDownRight, ArrowRight, ArrowUpRight, BookOpen, Check, ChevronDown,
   Disc3, Gamepad2, Heart, Menu, Music2, Palette, Search,
@@ -76,6 +77,7 @@ function getTasteMatchCount(person: Neighbour): number {
 function App() {
   const [category, setCategory] = useState<Category>('all')
   const [profileMode, setProfileMode] = useState(false)
+  const [personalPageMode, setPersonalPageMode] = useState(false)
   const [themeIndex, setThemeIndex] = useState(() => {
     const saved = readStored<number>('theme', 0)
     return Number.isInteger(saved) && saved >= 0 && saved < themes.length ? saved : 0
@@ -155,7 +157,7 @@ function App() {
         <span className="nav-status"><span className="live-dot" /> ALL SYSTEMS A LITTLE SILLY</span>
       </nav>
 
-      {profileMode ? <ProfileEditor onBack={() => { setProfileMode(false); window.scrollTo({ top: 0, behavior: 'smooth' }) }} /> : <div className="desktop-layout">
+      {personalPageMode ? <PersonalHomepage onBack={() => { setPersonalPageMode(false); setProfileMode(false); window.scrollTo({ top: 0, behavior: 'smooth' }) }} onEdit={() => { setPersonalPageMode(false); setProfileMode(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }} /> : profileMode ? <ProfileEditor onBack={() => { setProfileMode(false); window.scrollTo({ top: 0, behavior: 'smooth' }) }} onVisit={() => { setProfileMode(false); setPersonalPageMode(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }} /> : <div className="desktop-layout">
         <aside className="web-sidebar" aria-label="Personal web sidebar">
           <section className="sidebar-window profile-window"><div className="window-bar"><span>✳ ABOUT THIS PLACE</span><span>_ □ ×</span></div><div className="sidebar-inner"><div className="pixel-avatar">☺</div><h2>hi, internet pal!</h2><p>you have stumbled into my little corner of the web.</p><div className="status-pill"><span className="live-dot" /> SITE UNDER CONSTRUCTION</div><p className="handwritten">please wipe your shoes ♡</p></div></section>
           <section className="sidebar-window"><div className="window-bar"><span>NOW PLAYING</span><span>♫</span></div><div className="now-playing"><div className="cassette"><span>CF MIXTAPE 01</span><div className="cassette-reels"><i /><i /></div><small>side a · feelings</small></div><b>the internet is a mixtape</b><p>currently looping: imaginary soundtracks</p><div className="equalizer"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></div></div></section>

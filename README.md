@@ -73,3 +73,10 @@ To check the production bundle:
 ```bash
 npm run build
 ```
+
+
+## Phase 2.3 — Personal Homepage
+
+The Profile Lab now opens a full visitable personal homepage via **VISIT MY ACTUAL HOMEPAGE**. It uses the saved local profile (identity, status, bio, badges, palette, wallpaper, font, layout, and collections), includes toggleable desktop decorations, a visitor-counter-style flourish, a currently-playing equalizer, and a local guestbook form. Use **EDIT MY PAGE** to return to the Profile Lab.
+
+The page and guestbook remain local to this browser. This is a prototype: the visitor counter is decorative, and guestbook entries are not sent to other users.

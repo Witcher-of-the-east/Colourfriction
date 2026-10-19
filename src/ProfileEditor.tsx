@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, Check, Eye, RotateCcw, Save, Sparkles } from 'lucide-react'
+import { ArrowLeft, Check, Eye, RotateCcw, Save, Sparkles, ExternalLink } from 'lucide-react'
 
 type Profile = {
   displayName: string
@@ -56,7 +56,7 @@ function loadProfile(): Profile {
   }
 }
 
-export default function ProfileEditor({ onBack }: { onBack: () => void }) {
+export default function ProfileEditor({ onBack, onVisit }: { onBack: () => void; onVisit: () => void }) {
   const [profile, setProfile] = useState<Profile>(loadProfile)
   const [saved, setSaved] = useState(false)
   const [activeTab, setActiveTab] = useState<'identity' | 'style' | 'collections'>('identity')
@@ -165,7 +165,7 @@ export default function ProfileEditor({ onBack }: { onBack: () => void }) {
             </div>
             <div className="preview-profile-footer"><span>✿ THANKS FOR VISITING ✿</span><span>MADE WITH FEELING</span></div>
           </article>
-          <div className="preview-footnote"><span>✎</span> This is a local preview. Saving stores your choices in this browser only—not on a public account yet.</div>
+          <div className="preview-footnote"><span>✎</span> This is a local preview. Saving stores your choices in this browser only—not on a public account yet.</div><button className="visit-own-page-button" onClick={() => { saveProfile(); onVisit() }}><ExternalLink size={15}/> VISIT MY ACTUAL HOMEPAGE ↗</button>
           <div className="preview-checklist"><b>PROFILE CHECKLIST</b><span className={profile.displayName.trim() && profile.username.trim() ? 'done' : ''}><Check size={13} /> add your identity</span><span className={profile.bio.trim() ? 'done' : ''}><Check size={13} /> write a little lore</span><span className={profile.badges.length ? 'done' : ''}><Check size={13} /> pick your badges</span><span className={collections.some((item) => item.value.trim()) ? 'done' : ''}><Check size={13} /> pin some favourites</span></div>
           <div className="active-palette-note"><span style={{ background: activePalette.accent }} /> CURRENT PALETTE: {activePalette.name.toUpperCase()}</div>
         </section>
