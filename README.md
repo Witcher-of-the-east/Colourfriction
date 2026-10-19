@@ -43,6 +43,14 @@ npm run preview
 Media, member profiles, the visitor counter, and the web-ring are sample content. Theme selection, favourite hearts, and guestbook entries persist in this browser using localStorage. This is local-only persistence, not a user account or shared database. Authentication, PostgreSQL, and real TMDB/IGDB/music/book APIs are planned for later phases. Google Fonts are loaded remotely, so the custom typefaces need an internet connection.
 
 
+## Phase 2.2 — Personal web neighbourhood
+
+- A neighbourhood directory with four fictional demo profiles, each with a personal-page modal and interest list.
+- “Find my taste twins” compares the collections saved in the Profile Lab with demo-neighbour interests and sorts the directory by possible overlap. This is a lightweight local comparison, not a recommendation backend.
+- A fridge-style guestbook wall reflects notes stored in the current browser; profile modals can prefill a friendly guestbook note.
+- Optional sparkle cursor toggle, saved locally.
+- These are still local prototype features: there are no real accounts, public profiles, cross-device sync, or actual messaging.
+
 ## Phase 2 — Profile Lab
 
 The Phase 2 starter adds a **MY PROFILE LAB** item to the main navigation. It opens a live profile editor with three tabs:

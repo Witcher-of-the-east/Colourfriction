@@ -8,6 +8,7 @@ import {
 
 type Category = 'all' | 'movies' | 'games' | 'music' | 'series' | 'books'
 type Pick = { title: string; kind: Exclude<Category, 'all'>; detail: string; image: string; tag: string }
+type Neighbour = { handle: string; avatar: string; color: string; tagline: string; bio: string; likes: string[]; note: string }
 
 const picks: Pick[] = [
   { title: 'Perfect Blue', kind: 'movies', detail: '1997 · Satoshi Kon', image: 'https://image.tmdb.org/t/p/w500/6e5g6w5b9qU7R7B2Y7Y0x6m4N4J.jpg', tag: 'brain-melter' },
@@ -25,6 +26,13 @@ const categoryNames: Record<Category, string> = {
 const categoryIcons = {
   movies: Film, games: Gamepad2, music: Music2, series: Tv, books: BookOpen,
 }
+
+const neighbours: Neighbour[] = [
+  { handle: 'moth.mp3', avatar: '🦋', color: 'pink', tagline: 'music for abandoned malls', bio: 'collects songs that sound like a memory you cannot quite place. usually online after midnight.', likes: ['Portishead', 'Cocteau Twins', 'Silent Hill 2', 'Perfect Blue'], note: 'leave a song recommendation' },
+  { handle: 'pixel_goblin', avatar: '👾', color: 'yellow', tagline: '80 hours of lore, minimum', bio: 'will absolutely read every note, letter, and suspiciously placed book in your game.', likes: ['Disco Elysium', 'Outer Wilds', 'Night in the Woods', 'indie games'], note: 'tell me your favourite side quest' },
+  { handle: 'libraryghost', avatar: '📚', color: 'blue', tagline: 'annotates books like crime scenes', bio: 'likes strange little novels, marginalia, and stories that leave a bruise on your brain.', likes: ['Dune', 'Ursula K. Le Guin', 'Convenience Store Woman', 'weird fiction'], note: 'swap a book rec' },
+  { handle: 'starling.exe', avatar: '🌟', color: 'green', tagline: 'films with devastating endings', bio: 'keeps a watchlist longer than a grocery receipt. will defend animation as cinema forever.', likes: ['Satoshi Kon', 'The Good Place', 'Everything Everywhere', 'animation'], note: 'talk to me about endings' },
+]
 
 const tinyQuests = [
   'Replay a song that sounds like a specific memory.',
@@ -51,6 +59,20 @@ function readStored<T>(key: string, fallback: T): T {
   }
 }
 
+function getTasteMatchCount(person: Neighbour): number {
+  try {
+    const raw = window.localStorage.getItem('colourfriction-profile-v1')
+    if (!raw) return 0
+    const profile = JSON.parse(raw) as { movies?: string; games?: string; music?: string; books?: string }
+    const interests = [profile.movies, profile.games, profile.music, profile.books]
+      .flatMap((value) => (value || '').split(',').map((item) => item.trim().toLowerCase()))
+      .filter((item) => item.length > 2)
+    return person.likes.filter((like) => interests.some((interest) => interest.includes(like.toLowerCase()) || like.toLowerCase().includes(interest))).length
+  } catch {
+    return 0
+  }
+}
+
 function App() {
   const [category, setCategory] = useState<Category>('all')
   const [profileMode, setProfileMode] = useState(false)
@@ -64,6 +86,9 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const [liked, setLiked] = useState<number[]>(() => readStored<number[]>('favourites', [2]).filter((item) => Number.isInteger(item) && item >= 0 && item < picks.length))
   const [guestbookOpen, setGuestbookOpen] = useState(false)
+  const [activeNeighbour, setActiveNeighbour] = useState<Neighbour | null>(null)
+  const [cursorMode, setCursorMode] = useState(() => readStored<boolean>('sparkle-cursor', false))
+  const [tasteTwinMode, setTasteTwinMode] = useState(false)
   const [guestName, setGuestName] = useState('internet stranger')
   const [guestMessage, setGuestMessage] = useState('your site feels like a warm computer')
   const [guestEntries, setGuestEntries] = useState(() => readStored('guestbook', [{ name: 'moth.mp3', message: 'this place has excellent dust particles ✦' }, { name: 'pixel_goblin', message: 'signed the guestbook with my whole heart' }]))
@@ -80,6 +105,9 @@ function App() {
     try { window.localStorage.setItem('colourfriction:theme', JSON.stringify(themeIndex)) } catch { /* storage may be unavailable */ }
   }, [themeIndex])
   useEffect(() => {
+    try { window.localStorage.setItem('colourfriction:sparkle-cursor', JSON.stringify(cursorMode)) } catch { /* storage may be unavailable */ }
+  }, [cursorMode])
+  useEffect(() => {
     try { window.localStorage.setItem('colourfriction:favourites', JSON.stringify(liked)) } catch { /* storage may be unavailable */ }
   }, [liked])
   useEffect(() => {
@@ -93,6 +121,7 @@ function App() {
       if (event.key === 'Escape') {
         setSearchOpen(false)
         setGuestbookOpen(false)
+        setActiveNeighbour(null)
         setShowThemes(false)
         setMenuOpen(false)
         setNotice('')
@@ -103,7 +132,7 @@ function App() {
   }, [])
 
   return (
-    <div className="site-shell" style={{ '--accent': theme.accent, '--paper': theme.paper, '--ink': theme.ink, '--soft': theme.soft } as React.CSSProperties}>
+    <div className={`site-shell ${cursorMode ? 'sparkle-cursor-mode' : ''}`} style={{ '--accent': theme.accent, '--paper': theme.paper, '--ink': theme.ink, '--soft': theme.soft } as React.CSSProperties}>
       <div className="topline"><span><span className="live-dot" /> YOUR PERSONAL INTERNET, IN PROGRESS</span><span className="topline-right">INDEPENDENT WEB CLUB <span className="pixel-heart">♥</span> EST. 2026</span></div>
 
       <header className="masthead">
@@ -112,7 +141,7 @@ function App() {
         <div className="masthead-actions">
           <button className="icon-button search-trigger" onClick={() => setSearchOpen(true)} aria-label="Search the archive"><Search size={17} /><span>SEARCH</span></button>
           <button className="menu-toggle" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle navigation">{menuOpen ? <X /> : <Menu />}</button>
-          <button className="theme-toggle" onClick={() => setShowThemes(!showThemes)}><Palette size={16} /> CHANGE THE VIBE <ChevronDown size={13} /></button>
+          <button className="theme-toggle" onClick={() => setShowThemes(!showThemes)}><Palette size={16} /> CHANGE THE VIBE <ChevronDown size={13} /></button><button className={`cursor-toggle ${cursorMode ? 'cursor-toggle-on' : ''}`} onClick={() => setCursorMode(!cursorMode)} aria-pressed={cursorMode} title="Toggle sparkle cursor">✧ {cursorMode ? 'SPARKLE ON' : 'SPARKLE CURSOR'}</button>
         </div>
         {showThemes && <div className="theme-popover"><div className="popover-title">PICK YOUR PIXEL JUICE <button onClick={() => setShowThemes(false)} aria-label="Close themes"><X size={14} /></button></div><div className="theme-options">{themes.map((item, index) => <button key={item.name} className={`theme-option ${themeIndex === index ? 'selected' : ''}`} onClick={() => setThemeIndex(index)}><span className="swatches"><i style={{ background: item.paper }} /><i style={{ background: item.accent }} /><i style={{ background: item.ink }} /></span><span>{item.name}</span>{themeIndex === index && <Check size={14} />}</button>)}</div><p>just a preview for now — more knobs coming soon.</p></div>}
       </header>
@@ -183,8 +212,16 @@ function App() {
 
         <section className="community-section" id="community">
           <div className="community-copy"><div className="eyebrow"><span className="eyebrow-star">✳</span> OTHER HUMANS, APPARENTLY</div><h2>Find your<br /><em>kind of weird.</em></h2><p>There are people out there who also think that one side character deserved better. Let's find them.</p><a className="button-primary button-dark" href="#join">MEET THE NEIGHBOURS <ArrowUpRight size={16} /></a><div className="community-counter"><span className="counter-icon"><Globe2 size={18} /></span><span><b>001,337</b><small>PROBABLY THINKING ABOUT A MOVIE</small></span></div></div>
-          <div className="people-board"><div className="board-label">PINNED TO THE COMMUNITY BOARD <span>✳</span></div><div className="person-note note-pink"><div className="avatar avatar-pink">m</div><div><b>moth.mp3</b><p>“music that sounds like a haunted house”</p><span>LIKES: PORTISHEAD · SILVER SOUL</span></div><span className="pin-dot" /></div><div className="person-note note-yellow"><div className="avatar avatar-yellow">☆</div><div><b>pixel_goblin</b><p>“here for games with 80 hours of lore”</p><span>LIKES: DISCO ELYSIUM · OUTER WILDS</span></div><span className="pin-dot" /></div><div className="person-note note-blue"><div className="avatar avatar-blue">☻</div><div><b>libraryghost</b><p>“I annotate books like they're crime scenes”</p><span>LIKES: DUNE · URSULA K. LE GUIN</span></div><span className="pin-dot" /></div><div className="board-doodle">YOU<br />MIGHT<br />FIT HERE <span>↙</span></div><div className="board-footer"><span>NO COOL KIDS TABLE.</span><span>EVERYONE'S A LITTLE NICHE.</span></div></div>
+          <div className="people-board"><div className="board-label">PINNED TO THE COMMUNITY BOARD <span>✳</span></div><div className="person-note note-pink"><div className="avatar avatar-pink">m</div><div><b>moth.mp3</b><p>“music that sounds like a haunted house”</p><span>LIKES: PORTISHEAD · SILVER SOUL</span></div><button className="visit-neighbour" onClick={() => setActiveNeighbour(neighbours[0])}>OPEN PAGE ↗</button><span className="pin-dot" /></div><div className="person-note note-yellow"><div className="avatar avatar-yellow">☆</div><div><b>pixel_goblin</b><p>“here for games with 80 hours of lore”</p><span>LIKES: DISCO ELYSIUM · OUTER WILDS</span></div><button className="visit-neighbour" onClick={() => setActiveNeighbour(neighbours[1])}>OPEN PAGE ↗</button><span className="pin-dot" /></div><div className="person-note note-blue"><div className="avatar avatar-blue">☻</div><div><b>libraryghost</b><p>“I annotate books like they're crime scenes”</p><span>LIKES: DUNE · URSULA K. LE GUIN</span></div><button className="visit-neighbour" onClick={() => setActiveNeighbour(neighbours[2])}>OPEN PAGE ↗</button><span className="pin-dot" /></div><div className="board-doodle">YOU<br />MIGHT<br />FIT HERE <span>↙</span></div><div className="board-footer"><span>NO COOL KIDS TABLE.</span><span>EVERYONE'S A LITTLE NICHE.</span></div></div>
         </section>
+
+        <section className="neighbour-directory" aria-labelledby="directory-title">
+          <div className="directory-heading"><div><span className="tiny-label">THE NEIGHBOURHOOD DIRECTORY · DEMO PROFILES</span><h2 id="directory-title">Knock on a <em>little internet door.</em></h2><button className={`taste-twin-toggle ${tasteTwinMode ? 'taste-twin-active' : ''}`} onClick={() => setTasteTwinMode(!tasteTwinMode)}>{tasteTwinMode ? 'SHOW EVERYONE ↶' : 'FIND MY TASTE TWINS ✳'}</button></div><span className="directory-stamp">NO<br/>ALGORITHM<br/>JUST PEOPLE</span></div>
+          <div className="neighbour-grid">{(tasteTwinMode ? [...neighbours].sort((a, b) => getTasteMatchCount(b) - getTasteMatchCount(a)) : neighbours).map((person) => <article className={`neighbour-card neighbour-${person.color}`} key={person.handle}><div className="neighbour-card-top"><span className="neighbour-avatar">{person.avatar}</span><span className="neighbour-online"><i/> HERE-ISH</span></div><h3>{person.handle}</h3><p className="neighbour-tagline">“{person.tagline}”</p><div className="neighbour-likes">{person.likes.slice(0, 3).map((like) => <span key={like}>{like}</span>)}</div>{tasteTwinMode && <div className="taste-match-count">✳ {getTasteMatchCount(person)} POSSIBLE SHARED INTEREST{getTasteMatchCount(person) === 1 ? '' : 'S'}</div>}<button className="neighbour-visit" onClick={() => setActiveNeighbour(person)}>VISIT THEIR PAGE ↗</button></article>)}</div>
+          <p className="directory-footnote">These are fictional demo neighbours for now. Real accounts and public profiles will need a backend.</p>
+        </section>
+
+        <section className="guestbook-wall" aria-labelledby="guestbook-wall-title"><div className="guestbook-wall-heading"><div><span className="tiny-label">A LITTLE WALL OF HUMAN NOISE</span><h2 id="guestbook-wall-title">Notes left on the <em>fridge.</em></h2></div><button className="button-primary" onClick={() => setGuestbookOpen(true)}>LEAVE A NOTE <ArrowUpRight size={15}/></button></div><div className="guestbook-wall-notes">{guestEntries.slice(0, 4).map((entry, index) => <article className={`wall-note wall-note-${index % 4}`} key={`${entry.name}-${index}`}><span>✳ FROM {entry.name}</span><p>{entry.message}</p><small>PINNED WITH INTERNET MAGIC</small></article>)}</div><p className="guestbook-wall-foot">YOUR NOTES SAVE IN THIS BROWSER ONLY · PLEASE BE KIND TO THE NEXT STRANGER.</p></section>
 
         <section className="join-strip" id="join"><div className="join-star">✳</div><div><span className="tiny-label">THE WEB IS BETTER WITH YOU IN IT</span><h2>Make yourself <em>at home.</em></h2></div><button className="button-primary join-button" onClick={() => setNotice('Account creation is planned for Phase 4. For now, explore the scrapbook and make yourself at home!')}>I'M IN, LET ME IN <ArrowUpRight size={16} /></button><span className="join-sparkle">✧</span></section>
         {notice && <div className="phase-notice" role="status"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss message"><X size={15} /></button></div>}
@@ -192,6 +229,8 @@ function App() {
       </div>}
 
       <footer className="footer"><a className="footer-logo" href="#home">colourfriction<span>✳</span></a><p>MADE OF MANY LITTLE OBSESSIONS. <br />BUILT ON THE INTERNET, NOT THE ALGORITHM.</p><div className="footer-links"><a href="#about">ABOUT</a><a href="#discover">SCRAPBOOK</a><a href="#community">COMMUNITY</a><button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>BACK TO TOP ↑</button></div><span className="footer-copy">© 2026 COLOURFRICTION · A WORK IN PROGRESS</span></footer>
+
+      {activeNeighbour && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveNeighbour(null) }}><section className={`neighbour-profile-modal neighbour-${activeNeighbour.color}`} role="dialog" aria-modal="true" aria-label={`${activeNeighbour.handle} profile`}><div className="neighbour-modal-top"><span>PERSONAL PAGE · CF DIRECTORY</span><button className="icon-button" onClick={() => setActiveNeighbour(null)} aria-label="Close profile"><X/></button></div><div className="neighbour-modal-hero"><span className="neighbour-modal-avatar">{activeNeighbour.avatar}</span><div><span className="neighbour-online"><i/> HERE-ISH</span><h2>{activeNeighbour.handle}</h2><p>“{activeNeighbour.tagline}”</p></div></div><div className="neighbour-modal-bio"><span className="tiny-label">A NOTE FROM THE OWNER</span><p>{activeNeighbour.bio}</p></div><span className="tiny-label">CURRENTLY ROTATING IN THEIR BRAIN</span><div className="neighbour-modal-likes">{activeNeighbour.likes.map((like) => <span key={like}>✳ {like}</span>)}</div><button className="button-primary neighbour-hello" onClick={() => { setGuestName('internet stranger'); setGuestMessage(`hi ${activeNeighbour.handle}! ${activeNeighbour.note} ♡`); setActiveNeighbour(null); setGuestbookOpen(true) }}>LEAVE A LITTLE HELLO ↗</button><p className="neighbour-modal-foot">DEMO PROFILE · MESSAGES ARE NOT SENT TO A REAL PERSON.</p></section></div>}
 
       {guestbookOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setGuestbookOpen(false) }}><section className="search-modal guestbook-modal" role="dialog" aria-modal="true" aria-label="Guestbook"><div className="search-modal-head"><div><span className="tiny-label">THE DIGITAL GUESTBOOK</span><h2>Leave a little <em>hello.</em></h2></div><button className="icon-button" onClick={() => setGuestbookOpen(false)} aria-label="Close guestbook"><X /></button></div><form className="guestbook-form" onSubmit={(event) => { event.preventDefault(); if (guestName.trim() && guestMessage.trim()) { setGuestEntries((entries) => [{ name: guestName.trim(), message: guestMessage.trim() }, ...entries]); setGuestMessage(''); } }}><label>YOUR INTERNET NAME<input value={guestName} onChange={(event) => setGuestName(event.target.value)} maxLength={28} required /></label><label>LEAVE A NOTE<textarea value={guestMessage} onChange={(event) => setGuestMessage(event.target.value)} maxLength={120} required /></label><button className="button-primary" type="submit">PIN MY NOTE <ArrowUpRight size={15} /></button></form><div className="guestbook-entries">{guestEntries.map((entry, index) => <article key={`${entry.name}-${index}`}><span>✳ {entry.name}</span><p>{entry.message}</p></article>)}</div><div className="search-modal-foot"><span>SAVED IN THIS BROWSER · LOCAL DEMO</span><span>BE NICE OUT THERE ♡</span></div></section></div>}
       {searchOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSearchOpen(false) }}><section className="search-modal" role="dialog" aria-modal="true" aria-label="Search the archive"><div className="search-modal-head"><div><span className="tiny-label">THE ARCHIVE FINDER</span><h2>Looking for <em>something?</em></h2></div><button className="icon-button" onClick={() => setSearchOpen(false)} aria-label="Close search"><X /></button></div><label className="search-field"><Search size={18} /><input autoFocus placeholder="a film, a song, a feeling..." value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} /><kbd>ESC</kbd></label><div className="search-results">{searchResults.length ? searchResults.map((pick) => <button key={pick.title} className="search-result" onClick={() => { setCategory(pick.kind); setSearchOpen(false); document.getElementById('discover')?.scrollIntoView({ behavior: 'smooth' }) }}><span className="result-type">{pick.kind}</span><span>{pick.title}<small>{pick.detail}</small></span><ArrowUpRight size={15} /></button>) : <p className="no-results">Nothing in this tiny archive yet. Try another search.</p>}</div><div className="search-modal-foot"><span>MOCK ARCHIVE · REAL SEARCH INTERACTION</span><span>✳ BE CURIOUS</span></div></section></div>}
