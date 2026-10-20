@@ -1,5 +1,11 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, Check, Eye, RotateCcw, Save, Sparkles, ExternalLink } from 'lucide-react'
+import { MediaStampGrid, saveMediaArtwork, searchMediaCatalogue, type MediaSearchResult } from './MediaStamps'
+
+type MediaKind = 'movies' | 'games' | 'music' | 'books'
+type CustomShelf = { id: string; name: string; kind: MediaKind; items: string[]; description?: string; rating?: number; icon?: string; cover?: string }
+const CUSTOM_SHELVES_KEY = 'colourfriction-custom-shelves-v1'
+function readCustomShelves(): CustomShelf[] { try { const value = JSON.parse(localStorage.getItem(CUSTOM_SHELVES_KEY) || '[]'); return Array.isArray(value) ? value.slice(0, 12) : [] } catch { return [] } }
 
 type Profile = {
   displayName: string
@@ -61,6 +67,16 @@ export default function ProfileEditor({ onBack, onVisit }: { onBack: () => void;
   const [saved, setSaved] = useState(false)
   const [activeTab, setActiveTab] = useState<'identity' | 'style' | 'collections'>('identity')
   const [notice, setNotice] = useState('Your changes preview live. Save them to keep your page in this browser.')
+  const [collectionDrafts, setCollectionDrafts] = useState<Record<string, string>>({})
+  const [catalogueResults, setCatalogueResults] = useState<Record<string, MediaSearchResult[]>>({})
+  const [searchingCollection, setSearchingCollection] = useState<string | null>(null)
+  const [customShelves, setCustomShelves] = useState<CustomShelf[]>(readCustomShelves)
+  const [newShelfName, setNewShelfName] = useState('')
+  const [newShelfKind, setNewShelfKind] = useState<MediaKind>('movies')
+  const [customShelfDrafts, setCustomShelfDrafts] = useState<Record<string, string>>({})
+  const [customShelfSearchResults, setCustomShelfSearchResults] = useState<Record<string, MediaSearchResult[]>>({})
+  const [searchingShelf, setSearchingShelf] = useState<string | null>(null)
+  const [draggedShelfItem, setDraggedShelfItem] = useState<{ shelfId: string; index: number } | null>(null)
 
   const update = <K extends keyof Profile>(key: K, value: Profile[K]) => {
     setSaved(false)
@@ -72,6 +88,7 @@ export default function ProfileEditor({ onBack, onVisit }: { onBack: () => void;
   const saveProfile = () => {
     try {
       localStorage.setItem('colourfriction-profile-v1', JSON.stringify(profile))
+      localStorage.setItem(CUSTOM_SHELVES_KEY, JSON.stringify(customShelves))
       setSaved(true)
       setNotice('Saved in this browser! Your profile will be here when you come back on this device.')
     } catch {
@@ -82,12 +99,126 @@ export default function ProfileEditor({ onBack, onVisit }: { onBack: () => void;
   const resetProfile = () => {
     setSaved(false)
     setProfile({ ...starterProfile })
-    try { localStorage.removeItem('colourfriction-profile-v1') } catch { /* storage may be unavailable */ }
+    try { localStorage.removeItem('colourfriction-profile-v1'); localStorage.removeItem(CUSTOM_SHELVES_KEY) } catch { /* storage may be unavailable */ }
+    setCustomShelves([])
     setNotice('Starter profile restored. Save if you want to keep these defaults.')
   }
 
   const toggleBadge = (badge: string) => {
     update('badges', profile.badges.includes(badge) ? profile.badges.filter((item) => item !== badge) : [...profile.badges, badge].slice(0, 4))
+  }
+
+  const getTitles = (value: string) => value.split(',').map((item) => item.trim()).filter(Boolean)
+  const saveTitles = (key: 'movies' | 'games' | 'music' | 'books', titles: string[]) => update(key, titles.join(', '))
+  const addTitle = (key: 'movies' | 'games' | 'music' | 'books') => {
+    const title = (collectionDrafts[key] || '').trim()
+    const current = getTitles(profile[key])
+    if (!title) return
+    if (current.some((item) => item.toLowerCase() === title.toLowerCase())) { setNotice('That title is already on this shelf.'); return }
+    if (current.length >= 12) { setNotice('This shelf is full (12 stamps). Remove one before adding another.'); return }
+    saveTitles(key, [...current, title.slice(0, 100)])
+    setCollectionDrafts((items) => ({ ...items, [key]: '' }))
+    setNotice(`Added “${title}” to your shelf. Save your page to keep it.`)
+  }
+  const moveTitle = (key: 'movies' | 'games' | 'music' | 'books', index: number, direction: -1 | 1) => {
+    const titles = getTitles(profile[key])
+    const target = index + direction
+    if (target < 0 || target >= titles.length) return
+    const item = titles[index]; titles[index] = titles[target]; titles[target] = item
+    saveTitles(key, titles)
+  }
+  const searchCollection = async (key: MediaKind) => {
+    const query = (collectionDrafts[key] || '').trim()
+    if (!query) { setNotice('Type a title first, then search the catalogue.'); return }
+    setSearchingCollection(key)
+    setCatalogueResults((current) => ({ ...current, [key]: [] }))
+    const results = await searchMediaCatalogue(query, key)
+    setCatalogueResults((current) => ({ ...current, [key]: results }))
+    setSearchingCollection(null)
+    setNotice(results.length ? `Found ${results.length} catalogue matches for “${query}”. Choose the exact edition/artwork to pin it.` : 'No catalogue matches found. You can still add the title and customise its stamp manually.')
+  }
+  const addCatalogueResult = (key: MediaKind, result: MediaSearchResult) => {
+    const current = getTitles(profile[key])
+    if (current.some((item) => item.toLowerCase() === result.title.toLowerCase())) { setNotice('That title is already on this shelf.'); return }
+    if (current.length >= 12) { setNotice('This shelf is full (12 stamps). Remove one before adding another.'); return }
+    saveTitles(key, [...current, result.title.slice(0, 100)])
+    saveMediaArtwork(key, result.title, result.image)
+    setCollectionDrafts((items) => ({ ...items, [key]: '' }))
+    setCatalogueResults((items) => ({ ...items, [key]: [] }))
+    setNotice(`Pinned “${result.title}” with the selected catalogue artwork. Save your page to keep the collection.`)
+  }
+  const createCustomShelf = () => {
+    setSaved(false)
+    const name = newShelfName.trim().slice(0, 42)
+    if (!name) return
+    if (customShelves.length >= 12) { setNotice('You can make up to 12 custom shelves.'); return }
+    if (customShelves.some((shelf) => shelf.name.toLowerCase() === name.toLowerCase())) { setNotice('A shelf with that name already exists.'); return }
+    setCustomShelves((items) => [...items, { id: `shelf-${Date.now()}`, name, kind: newShelfKind, items: [], description: '', rating: 0, icon: ({ movies: '🎬', games: '🎮', music: '🎧', books: '📚' } as Record<MediaKind, string>)[newShelfKind] }])
+    setNewShelfName('')
+    setNotice(`Created the “${name}” shelf. Add titles below, then save your page.`)
+  }
+  const updateCustomShelf = (id: string, changes: Partial<CustomShelf>) => {
+    setSaved(false)
+    setCustomShelves((items) => items.map((shelf) => shelf.id === id ? { ...shelf, ...changes } : shelf))
+  }
+  const moveCustomShelf = (id: string, direction: -1 | 1) => {
+    setSaved(false)
+    setCustomShelves((items) => {
+      const index = items.findIndex((shelf) => shelf.id === id)
+      const target = index + direction
+      if (index < 0 || target < 0 || target >= items.length) return items
+      const next = [...items]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    })
+  }
+  const reorderCustomShelfItem = (shelfId: string, from: number, to: number) => {
+    if (from === to) return
+    setSaved(false)
+    setCustomShelves((items) => items.map((shelf) => {
+      if (shelf.id !== shelfId || from < 0 || to < 0 || from >= shelf.items.length || to >= shelf.items.length) return shelf
+      const next = [...shelf.items]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return { ...shelf, items: next }
+    }))
+  }
+  const moveCustomShelfItem = (id: string, index: number, direction: -1 | 1) => {
+    setSaved(false)
+    setCustomShelves((items) => items.map((shelf) => {
+      if (shelf.id !== id) return shelf
+      const target = index + direction
+      if (target < 0 || target >= shelf.items.length) return shelf
+      const next = [...shelf.items]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return { ...shelf, items: next }
+    }))
+  }
+  const searchCustomShelf = async (shelf: CustomShelf) => {
+    const query = (customShelfDrafts[shelf.id] || '').trim()
+    if (!query) return
+    setSearchingShelf(shelf.id)
+    setCustomShelfSearchResults((current) => ({ ...current, [shelf.id]: [] }))
+    const results = await searchMediaCatalogue(query, shelf.kind)
+    setCustomShelfSearchResults((current) => ({ ...current, [shelf.id]: results }))
+    setSearchingShelf(null)
+    setNotice(results.length ? `Found ${results.length} matches for “${query}”. Choose the right edition for this shelf.` : 'No matches found. You can still add the title manually and edit its stamp later.')
+  }
+  const addCustomShelfCatalogueResult = (shelf: CustomShelf, result: MediaSearchResult) => {
+    if (shelf.items.some((item) => item.toLowerCase() === result.title.toLowerCase())) { setNotice('That title is already on this shelf.'); return }
+    if (shelf.items.length >= 12) { setNotice('This shelf is full (12 stamps). Remove one before adding another.'); return }
+    updateCustomShelf(shelf.id, { items: [...shelf.items, result.title] })
+    saveMediaArtwork(shelf.kind, result.title, result.image)
+    setCustomShelfDrafts((items) => ({ ...items, [shelf.id]: '' }))
+    setCustomShelfSearchResults((items) => ({ ...items, [shelf.id]: [] }))
+    setNotice(`Pinned “${result.title}” with the selected artwork. Save your page to keep it.`)
+  }
+  const addCustomShelfItem = (id: string) => {
+    setSaved(false)
+    const title = (customShelfDrafts[id] || '').trim().slice(0, 100)
+    if (!title) return
+    setCustomShelves((items) => items.map((shelf) => shelf.id !== id ? shelf : shelf.items.length >= 12 || shelf.items.some((item) => item.toLowerCase() === title.toLowerCase()) ? shelf : { ...shelf, items: [...shelf.items, title] }))
+    setCustomShelfDrafts((items) => ({ ...items, [id]: '' }))
   }
 
   const collections = [
@@ -131,6 +262,7 @@ export default function ProfileEditor({ onBack, onVisit }: { onBack: () => void;
           {activeTab === 'style' && <div className="profile-form-panel">
             <div className="form-section-title"><span>03 / PICK YOUR COLOUR STORY</span><small>NO WRONG ANSWERS</small></div>
             <div className="palette-picker">{palettes.map((palette) => <button key={palette.name} className={profile.accent === palette.accent ? 'selected' : ''} onClick={() => { update('accent', palette.accent); update('paper', palette.paper) }}><span className="palette-preview" style={{ background: palette.paper, borderColor: palette.accent }}><i style={{ background: palette.accent }} /><i style={{ background: '#ffdf70' }} /><i style={{ background: '#211b2d' }} /></span><span>{palette.name}</span>{profile.accent === palette.accent && <Check size={14} />}</button>)}</div>
+            <div className="custom-colour-row"><label>MAKE YOUR OWN ACCENT<input aria-label="Custom accent colour" type="color" value={profile.accent} onChange={(event) => update('accent', event.target.value)} /><span>{profile.accent.toUpperCase()}</span></label><label>MAKE YOUR OWN PAPER<input aria-label="Custom paper colour" type="color" value={profile.paper} onChange={(event) => update('paper', event.target.value)} /><span>{profile.paper.toUpperCase()}</span></label></div>
             <div className="form-section-title"><span>04 / BACKGROUND TEXTURE</span><small>SET THE SCENE</small></div>
             <div className="wallpaper-picker">{[{ id: 'stars', name: 'starry desktop', glyph: '✦ ✧ ✦' }, { id: 'graph', name: 'graph paper', glyph: '▦ ▦ ▦' }, { id: 'dots', name: 'polka party', glyph: '•• •• ••' }, { id: 'plain', name: 'plain-ish', glyph: '—  —  —' }].map((item) => <button key={item.id} className={profile.wallpaper === item.id ? 'selected' : ''} onClick={() => update('wallpaper', item.id)}><span className={`wallpaper-swatch wallpaper-${item.id}`}>{item.glyph}</span><span>{item.name}</span></button>)}</div>
             <div className="form-section-title"><span>05 / LETTER PERSONALITY</span><small>THE FONT MATTERS</small></div>
@@ -140,9 +272,37 @@ export default function ProfileEditor({ onBack, onVisit }: { onBack: () => void;
           </div>}
 
           {activeTab === 'collections' && <div className="profile-form-panel">
-            <div className="form-section-title"><span>07 / YOUR TASTE COLLECTIONS</span><small>COMMA-SEPARATED FOR NOW</small></div>
-            <p className="collection-editor-note">These are editable profile lists for Phase 2. Real catalog search and artwork will arrive in the media API phase.</p>
-            {collections.map((collection) => <label className="profile-field collection-field" key={collection.key}><span className="collection-field-title"><b>{collection.icon}</b> {collection.label}</span><textarea rows={3} value={collection.value} onChange={(event) => update(collection.key, event.target.value)} placeholder="Add a few favourites, separated by commas" /><span className="field-hint">Separate each title with a comma.</span></label>)}
+            <div className="form-section-title"><span>07 / YOUR TASTE COLLECTIONS</span><small>ONE STAMP AT A TIME</small></div>
+            <p className="collection-editor-note">Add individual titles, remove ones that no longer belong, and reorder your shelves. Click any stamp in the preview to edit its cover. Up to 12 stamps per shelf.</p>
+            {collections.map((collection) => {
+              const key = collection.key as 'movies' | 'games' | 'music' | 'books'
+              const titles = getTitles(collection.value)
+              return <section className="profile-field collection-field" key={collection.key}>
+                <span className="collection-field-title"><b>{collection.icon}</b> {collection.label}<small>{titles.length}/12 STAMPS</small></span>
+                <div className="collection-title-list">{titles.map((title, index) => <div className="collection-title-chip" key={`${title}-${index}`}><span className="collection-title-number">{String(index + 1).padStart(2, '0')}</span><span className="collection-title-text">{title}</span><button type="button" onClick={() => moveTitle(key, index, -1)} disabled={index === 0} aria-label={`Move ${title} earlier`}>↑</button><button type="button" onClick={() => moveTitle(key, index, 1)} disabled={index === titles.length - 1} aria-label={`Move ${title} later`}>↓</button><button type="button" className="collection-remove" onClick={() => saveTitles(key, titles.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${title}`}>×</button></div>)}</div>
+                <div className="collection-add-row"><input value={collectionDrafts[key] || ''} maxLength={100} onChange={(event) => setCollectionDrafts((items) => ({ ...items, [key]: event.target.value }))} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addTitle(key) } }} placeholder={`Search or add a ${key === 'movies' ? 'film' : key === 'games' ? 'game' : key === 'music' ? 'song or artist' : 'book'}...`} /><button type="button" onClick={() => addTitle(key)} disabled={!((collectionDrafts[key] || '').trim()) || titles.length >= 12}>+ ADD TEXT</button></div>
+                <button type="button" className="catalogue-search-button" onClick={() => searchCollection(key)} disabled={searchingCollection === key || !((collectionDrafts[key] || '').trim())}>{searchingCollection === key ? 'SEARCHING CATALOGUES…' : '⌕ SEARCH CATALOGUE BEFORE ADDING'}</button>
+                {(catalogueResults[key] || []).length > 0 && <div className="profile-catalogue-results" aria-label={`${key} catalogue matches`}>{catalogueResults[key].map((result, resultIndex) => <article key={`${result.image}-${resultIndex}`}><img src={result.image} alt={`${result.title} artwork`} loading="lazy"/><div><b>{result.title}</b><small>{result.detail || 'Catalogue result'}</small><button type="button" onClick={() => addCatalogueResult(key, result)}>+ PIN THIS EDITION</button></div></article>)}</div>}
+                {titles.length === 0 && <p className="field-hint">Search the catalogue to choose a cover, or add a title manually.</p>}
+              </section>
+            })}
+            <section className="custom-shelf-builder">
+              <div className="form-section-title"><span>08 / MAKE YOUR OWN SHELVES</span><small>NAME YOUR LITTLE CORNER</small></div>
+              <p className="collection-editor-note">Create shelves with names like “comfort films”, “games that broke me”, or “books for rainy days”. Each shelf can hold up to 12 stamps.</p>
+              <div className="custom-shelf-create-row"><input value={newShelfName} maxLength={42} onChange={(event) => setNewShelfName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); createCustomShelf() } }} placeholder="e.g. films that live rent-free"/><select value={newShelfKind} onChange={(event) => setNewShelfKind(event.target.value as MediaKind)} aria-label="Media type for new shelf"><option value="movies">Movies</option><option value="games">Games</option><option value="music">Music</option><option value="books">Books</option></select><button type="button" onClick={createCustomShelf} disabled={!newShelfName.trim() || customShelves.length >= 12}>+ CREATE SHELF</button></div>
+              {customShelves.map((shelf) => <section className="custom-shelf-edit-card" key={shelf.id}>
+                <header><span>{shelf.icon || ({ movies: '🎬', games: '🎮', music: '🎧', books: '📚' } as Record<MediaKind, string>)[shelf.kind]} {shelf.name}</span><div className="custom-shelf-header-actions"><button type="button" onClick={() => moveCustomShelf(shelf.id, -1)} disabled={customShelves[0]?.id === shelf.id} aria-label={`Move ${shelf.name} shelf earlier`}>↑</button><button type="button" onClick={() => moveCustomShelf(shelf.id, 1)} disabled={customShelves[customShelves.length - 1]?.id === shelf.id} aria-label={`Move ${shelf.name} shelf later`}>↓</button><button type="button" onClick={() => { setSaved(false); setCustomShelves((items) => items.filter((item) => item.id !== shelf.id)) }} aria-label={`Delete ${shelf.name} shelf`}>×</button></div></header>
+                <small>{shelf.items.length}/12 · {shelf.kind.toUpperCase()} · CUSTOMISE THIS SHELF</small>
+                <div className="custom-shelf-meta-grid"><label>SHELF NAME<input value={shelf.name} maxLength={42} onChange={(event) => updateCustomShelf(shelf.id, { name: event.target.value.slice(0, 42) })}/></label><label>ICON<select value={shelf.icon || ({ movies: '🎬', games: '🎮', music: '🎧', books: '📚' } as Record<MediaKind, string>)[shelf.kind]} onChange={(event) => updateCustomShelf(shelf.id, { icon: event.target.value })}>{['🎬','🎮','🎧','📚','🍓','🌙','🪼','🦋','💿','🌱','🧸','🪐'].map((icon) => <option key={icon} value={icon}>{icon}</option>)}</select></label></div>
+                <label className="custom-shelf-description">SHELF DESCRIPTION<textarea value={shelf.description || ''} maxLength={120} rows={2} onChange={(event) => updateCustomShelf(shelf.id, { description: event.target.value })} placeholder="Why do these titles belong together?"/></label>
+                <label className="custom-shelf-cover-field">SHELF COVER IMAGE URL<input type="url" value={shelf.cover || ''} maxLength={600} onChange={(event) => updateCustomShelf(shelf.id, { cover: event.target.value })} placeholder="https://… (optional)"/><small>Use a direct image link. Leave blank for the handmade paper look.</small></label>
+                <label className="custom-shelf-rating">PERSONAL VIBE RATING <span>{shelf.rating || 0}/5 ✦</span><input type="range" min="0" max="5" step="1" value={shelf.rating || 0} onChange={(event) => updateCustomShelf(shelf.id, { rating: Number(event.target.value) })}/><small>Optional, just your own rating of this collection.</small></label>
+                <div className="custom-shelf-items" aria-label={`Reorder items in ${shelf.name}`}>{shelf.items.map((item, index) => <span key={`${item}-${index}`} draggable onDragStart={(event) => { setDraggedShelfItem({ shelfId: shelf.id, index }); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', item) }} onDragOver={(event) => { if (draggedShelfItem?.shelfId === shelf.id) event.preventDefault() }} onDrop={(event) => { event.preventDefault(); if (draggedShelfItem?.shelfId === shelf.id) reorderCustomShelfItem(shelf.id, draggedShelfItem.index, index); setDraggedShelfItem(null) }} onDragEnd={() => setDraggedShelfItem(null)} className={draggedShelfItem?.shelfId === shelf.id && draggedShelfItem.index === index ? 'shelf-item-dragging' : ''}><b>{String(index + 1).padStart(2, '0')}</b><span className="custom-shelf-item-title">{item}</span><button type="button" disabled={index === 0} onClick={() => moveCustomShelfItem(shelf.id, index, -1)} aria-label={`Move ${item} earlier`}>↑</button><button type="button" disabled={index === shelf.items.length - 1} onClick={() => moveCustomShelfItem(shelf.id, index, 1)} aria-label={`Move ${item} later`}>↓</button><button type="button" onClick={() => { setSaved(false); updateCustomShelf(shelf.id, { items: shelf.items.filter((value, itemIndex) => itemIndex !== index) }) }} aria-label={`Remove ${item} from ${shelf.name}`}>×</button></span>)}</div>
+                <div className="collection-add-row"><input value={customShelfDrafts[shelf.id] || ''} maxLength={100} onChange={(event) => setCustomShelfDrafts((items) => ({ ...items, [shelf.id]: event.target.value }))} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addCustomShelfItem(shelf.id) } }} placeholder="Add a title to this shelf"/><button type="button" onClick={() => addCustomShelfItem(shelf.id)} disabled={!((customShelfDrafts[shelf.id] || '').trim()) || shelf.items.length >= 12}>+ ADD TEXT</button></div>
+                <button type="button" className="catalogue-search-button" onClick={() => searchCustomShelf(shelf)} disabled={searchingShelf === shelf.id || !((customShelfDrafts[shelf.id] || '').trim()) || shelf.items.length >= 12}>{searchingShelf === shelf.id ? 'SEARCHING…' : '⌕ FIND ARTWORK & ADD'}</button>
+                {(customShelfSearchResults[shelf.id] || []).length > 0 && <div className="profile-catalogue-results" aria-label={`${shelf.name} search results`}>{customShelfSearchResults[shelf.id].map((result, index) => <article key={`${result.image}-${index}`}><img src={result.image} alt={`${result.title} artwork`} loading="lazy"/><div><b>{result.title}</b><small>{result.detail || 'Catalogue result'}</small><button type="button" onClick={() => addCustomShelfCatalogueResult(shelf, result)}>+ PIN THIS EDITION</button></div></article>)}</div>}
+              </section>)}
+            </section>
           </div>}
 
           <div className="profile-save-row"><p className={saved ? 'save-notice success' : 'save-notice'} aria-live="polite">{notice}</p><div><button className="profile-reset-button" onClick={resetProfile}><RotateCcw size={14} /> RESET</button><button className="button-primary" onClick={saveProfile}><Save size={14} /> {saved ? 'SAVED!' : 'SAVE MY PAGE'}</button></div></div>
@@ -159,9 +319,9 @@ export default function ProfileEditor({ onBack, onVisit }: { onBack: () => void;
             <div className="preview-collection-head"><span>✳ MY CURRENT OBSESSIONS</span><small>THE GOOD STUFF</small></div>
             <div className="preview-collections">
               {collections.map((collection) => {
-                const items = collection.value.split(',').map((item) => item.trim()).filter(Boolean)
-                return <section className="preview-collection" key={collection.key}><h3><span>{collection.icon}</span> {collection.label}</h3>{items.length ? <ul>{items.slice(0, 5).map((item) => <li key={item}>{item}</li>)}</ul> : <p className="empty-collection">nothing pinned here yet...</p>}</section>
+                return <section className="preview-collection" key={collection.key}><h3><span>{collection.icon}</span> {collection.label}</h3><MediaStampGrid value={collection.value} kind={collection.key} compact /></section>
               })}
+              {customShelves.map((shelf) => <section className="preview-collection preview-custom-collection" key={shelf.id}><h3><span>{shelf.icon || ({ movies: '🎬', games: '🎮', music: '🎧', books: '📚' } as Record<MediaKind, string>)[shelf.kind]}</span> {shelf.name}</h3>{shelf.cover && <img className="preview-custom-shelf-cover" src={shelf.cover} alt={`${shelf.name} shelf cover`} loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none' }}/> }{shelf.description && <p className="preview-custom-shelf-description">{shelf.description}</p>}{(shelf.rating || 0) > 0 && <small className="preview-custom-shelf-rating">MY VIBE RATING · {'✦'.repeat(shelf.rating || 0)}{'✧'.repeat(5 - (shelf.rating || 0))}</small>}<MediaStampGrid value={shelf.items} kind={shelf.kind} compact /></section>)}
             </div>
             <div className="preview-profile-footer"><span>✿ THANKS FOR VISITING ✿</span><span>MADE WITH FEELING</span></div>
           </article>

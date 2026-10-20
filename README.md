@@ -1,82 +1,42 @@
-# Colourfriction — Phase 1: Personal-Web Edition
+# Colourfriction — Phase 2.8
 
-A deliberately nostalgic React + TypeScript prototype for Colourfriction, an entertainment-taste community. This iteration leans into early personal websites, Neocities-style sidebars, pixel controls, tiny web badges, browser-window panels, and hand-made visual details rather than a conventional modern landing page.
+A deliberately handmade, retro personal-web scrapbook built with React, TypeScript and Vite.
 
-## Included in this iteration
+## Phase 2.8 refinements
 
-- Retro two-column homepage with a personal-web sidebar
-- Faux browser windows: site status, now-playing cassette, and link list
-- 88×31-inspired web badges, webring, visitor counter, and sticker details
-- Interactive guestbook modal (demo entries persist in this browser)
-- Four colour palettes in the theme switcher
-- Media scrapbook filters, search modal, and favourite hearts
-- Responsive layout for mobile and desktop
-- Distinct display/type styles: Bungee Shade, Silkscreen, VT323, Syne, Caveat, Fraunces
+### Customisation 2.0
+- Custom accent and paper colours in addition to the preset palettes.
+- Full-page sticker canvas: drag decorations across the entire homepage, not only the welcome panel.
+- Select any sticker and use precise horizontal/vertical position, rotation, and size sliders; remove a selected sticker when you no longer want it. Arrow keys move the selected sticker in small increments; hold Shift for larger steps.
+- Create custom text stickers, move/rotate/resize them, and save their content and positions in this browser.
+- The decoration bar can pin/unpin up to 12 emoji decorations; up to 20 custom text stickers can be added. Reset positions to start over.
+- Existing identity, badges, wallpaper textures, fonts, layouts, and live preview remain available.
+
+### Media Collection 2.0
+- Manage each standard collection as individual titles instead of editing a comma-separated text box.
+- Search the catalogue before adding a title, review multiple matches and select the exact result/artwork to pin. Manual title entry remains available when a catalogue has no match.
+- Add up to 12 items per standard shelf, remove items, and reorder them with accessible arrow buttons.
+- Create up to 12 custom-named shelves (for example, “comfort films” or “books for rainy days”), choose an icon, add a description and optional cover image URL, set a personal 0–5 vibe rating, and add/remove titles. Reorder shelves with arrow controls and drag titles to rearrange them; arrow controls remain available as an alternative.
+- Custom shelves appear in both the live Profile Lab preview and the personal homepage.
+- Click any stamp to open Stamp Workshop. You can search for more cover options, choose one, paste a URL, or upload a cover.
+- Uploaded images are resized before saving to help reduce local browser-storage usage.
+- Catalogue lookups use Google Books, Apple's iTunes Search API, and Steam Store Search. Results are ranked by title similarity, and result details include available authors, artists, publishers, release years, or catalogue identifiers. An internet connection is required for catalogue lookups.
 
 ## Run locally
 
-You need Node.js 20+ and npm.
+Requirements: Node.js 18 or newer recommended.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite, usually `http://localhost:5173`.
-
-Build for production:
-
-```bash
-npm run build
-npm run preview
-```
-
-## Phase 1 verification status
-
-- Core homepage, retro visual system, responsive layout rules, theme switching, search, category filtering, favourites, and guestbook UI are implemented.
-- Theme selection, favourite hearts, and guestbook notes are saved locally in the current browser. Clearing site data removes them; they do not sync between devices.
-- Keyboard Escape closes open overlays and menus; visible controls include focus styles.
-- A full production build still needs to be run on a machine where npm can install the declared dependencies.
-
-## Current prototype limits
-
-Media, member profiles, the visitor counter, and the web-ring are sample content. Theme selection, favourite hearts, and guestbook entries persist in this browser using localStorage. This is local-only persistence, not a user account or shared database. Authentication, PostgreSQL, and real TMDB/IGDB/music/book APIs are planned for later phases. Google Fonts are loaded remotely, so the custom typefaces need an internet connection.
-
-
-## Phase 2.2 — Personal web neighbourhood
-
-- A neighbourhood directory with four fictional demo profiles, each with a personal-page modal and interest list.
-- “Find my taste twins” compares the collections saved in the Profile Lab with demo-neighbour interests and sorts the directory by possible overlap. This is a lightweight local comparison, not a recommendation backend.
-- A fridge-style guestbook wall reflects notes stored in the current browser; profile modals can prefill a friendly guestbook note.
-- Optional sparkle cursor toggle, saved locally.
-- These are still local prototype features: there are no real accounts, public profiles, cross-device sync, or actual messaging.
-
-## Phase 2 — Profile Lab
-
-The Phase 2 starter adds a **MY PROFILE LAB** item to the main navigation. It opens a live profile editor with three tabs:
-
-- **Identity:** display name, username, emoji avatar, status, bio, and web badges.
-- **The vibe:** five colour palettes, four background textures, three font treatments, and two layout styles.
-- **My stuff:** editable favourites for movies, games, music, and books.
-
-Changes update the preview immediately. **Save My Page** stores profile settings in this browser using local storage. This is a local prototype only: it does not publish a public profile, create accounts, sync across devices, or connect to a media catalog. Those require later authentication, database, and API phases.
-
-### Run
-
-```bash
-npm install
-npm run dev
-```
-
-To check the production bundle:
+To verify the production build:
 
 ```bash
 npm run build
 ```
 
+## Storage and limitations
 
-## Phase 2.3 — Personal Homepage
-
-The Profile Lab now opens a full visitable personal homepage via **VISIT MY ACTUAL HOMEPAGE**. It uses the saved local profile (identity, status, bio, badges, palette, wallpaper, font, layout, and collections), includes toggleable desktop decorations, a visitor-counter-style flourish, a currently-playing equalizer, and a local guestbook form. Use **EDIT MY PAGE** to return to the Profile Lab.
-
-The page and guestbook remain local to this browser. This is a prototype: the visitor counter is decorative, and guestbook entries are not sent to other users.
+This remains a front-end prototype. Profile fields, stamp overrides, sticker layout, custom text stickers, named shelves, decorations, and guestbook entries are stored in the current browser's local storage. They are not public, synced, or shared with other devices. Catalogue endpoints may return different results or be unavailable; use the custom URL/upload options if that happens. Local storage has a finite quota, so avoid uploading many large images.
