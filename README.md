@@ -1,65 +1,329 @@
-# Colourfriction — Phase 2.8
+# 🎨 Colourfriction
 
-A deliberately handmade, retro personal-web scrapbook built with React, TypeScript and Vite.
+### Your interests. Your space. Your internet.
 
-## Phase 2.8 refinements
+**Colourfriction** is a customizable, retro-inspired social platform built around personal expression, entertainment, and internet culture. Inspired by the early web, personal homepages, and Neocities-style websites, Colourfriction lets users create a digital space that reflects their personality, interests, and creative identity.
 
-### Customisation 2.0
-- Custom accent and paper colours in addition to the preset palettes.
-- Full-page sticker canvas: drag decorations across the entire homepage, not only the welcome panel.
-- Select any sticker and use precise horizontal/vertical position, rotation, and size sliders; remove a selected sticker when you no longer want it. Arrow keys move the selected sticker in small increments; hold Shift for larger steps.
-- Create custom text stickers, move/rotate/resize them, and save their content and positions in this browser.
-- The decoration bar can pin/unpin up to 12 emoji decorations; up to 20 custom text stickers can be added. Reset positions to start over.
-- Existing identity, badges, wallpaper textures, fonts, layouts, and live preview remain available.
+Instead of generic social media profiles, Colourfriction focuses on individuality through customizable layouts, personal media collections, stickers, colors, reviews, and decorative elements.
 
-### Media Collection 2.0
-- Manage each standard collection as individual titles instead of editing a comma-separated text box.
-- Search the catalogue before adding a title, review multiple matches and select the exact result/artwork to pin. Manual title entry remains available when a catalogue has no match.
-- Add up to 12 items per standard shelf, remove items, and reorder them with accessible arrow buttons.
-- Create up to 12 custom-named shelves (for example, “comfort films” or “books for rainy days”), choose an icon, add a description and optional cover image URL, set a personal 0–5 vibe rating, and add/remove titles. Reorder shelves with arrow controls and drag titles to rearrange them; arrow controls remain available as an alternative.
-- Custom shelves appear in both the live Profile Lab preview and the personal homepage.
-- Click any stamp to open Stamp Workshop. You can search for more cover options, choose one, paste a URL, or upload a cover.
-- Uploaded images are resized before saving to help reduce local browser-storage usage.
-- Catalogue lookups use Google Books, Apple's iTunes Search API, and Steam Store Search. Results are ranked by title similarity, and result details include available authors, artists, publishers, release years, or catalogue identifiers. An internet connection is required for catalogue lookups.
+> The internet used to feel personal. Colourfriction aims to bring that feeling back.
 
-## Run locally
+---
 
-Requirements: Node.js 18 or newer recommended.
+## ✨ Features
+
+### 🏠 Personal Homepage
+- Create and customize a personal homepage.
+- Personalize the appearance of your digital space.
+- Organize entertainment interests into custom collections.
+- Build a profile that reflects your personality and taste.
+
+### 🎬 Media Stamps
+- Explore and organize entertainment media.
+- Display media artwork and covers.
+- Customize media entries with personal titles and cover images.
+- Add personal reviews and ratings.
+- Mark favorite media.
+- Organize media into personalized shelves.
+
+### 📚 Custom Shelves
+- Create your own media shelves.
+- Organize collections around your interests.
+- Customize shelf names and contents.
+- Import and export shelf data.
+- Build collections that reflect your individual taste.
+
+### 🎨 Customization and Personalization
+- Customize colors and themes.
+- Arrange stickers and decorative elements.
+- Upload custom sticker images.
+- Position decorations around your personal space.
+- Experiment with different visual styles.
+
+### 🖼️ Sticker Studio
+- Create and manage custom stickers.
+- Personalize your homepage with decorative elements.
+- Build a more expressive and individual profile.
+
+### ✍️ Personal Reviews
+- Write reviews for media you enjoy.
+- Add ratings and personal opinions.
+- Keep track of your entertainment interests.
+
+### 📖 Guestbook
+- Leave messages in the guestbook demonstration.
+- Experience a nostalgic feature inspired by classic personal websites.
+
+### 💾 Backup and Restore
+- Export personal customization data.
+- Restore supported data from backups.
+- Import and export supported shelf information.
+- Handle local storage errors more gracefully.
+
+---
+
+## 🛠️ Technology Stack
+
+### Frontend
+- **React 19** — Component-based user interface.
+- **TypeScript** — Type safety and maintainable code.
+- **Vite** — Development server and build tooling.
+- **CSS** — Custom styling, layouts, themes, and visual effects.
+- **Lucide React** — Interface icons.
+
+### Backend — In Development
+- **Node.js** — JavaScript runtime.
+- **Express** — Backend API framework.
+- **TypeScript** — Backend type safety.
+- **PostgreSQL** — Relational database.
+- **Neon** — Hosted PostgreSQL database provider.
+- **node-postgres (`pg`)** — PostgreSQL client for Node.js.
+- **dotenv** — Environment variable management.
+
+The backend is being developed separately from the existing React frontend.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+Install the following before running the project:
+
+- [Node.js](https://nodejs.org/)
+- npm, included with Node.js
+- Git
+- [Visual Studio Code](https://code.visualstudio.com/) (recommended)
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/Witcher-of-the-east/Colourfriction.git
+```
+
+### 2. Navigate to the Project
+
+```bash
+cd Colourfriction
+```
+
+### 3. Install Dependencies
 
 ```bash
 npm install
+```
+
+### 4. Start the Development Server
+
+```bash
 npm run dev
 ```
 
-To verify the production build:
+Open the local URL displayed in your terminal, usually:
+
+```text
+http://localhost:5173
+```
+
+### 5. Build for Production
+
+To verify the frontend build:
 
 ```bash
 npm run build
 ```
 
-## Storage and limitations
+To preview the production build locally:
 
-This remains a front-end prototype. Profile fields, stamp overrides, sticker layout, custom text stickers, named shelves, decorations, and guestbook entries are stored in the current browser's local storage. They are not public, synced, or shared with other devices. Catalogue endpoints may return different results or be unavailable; use the custom URL/upload options if that happens. Local storage has a finite quota, so avoid uploading many large images.
+```bash
+npm run preview
+```
 
+---
 
-## Phase 2.9 refinements
+## 🗂️ Project Structure
 
-- Profile Lab includes a JSON backup and restore workflow for local profile data, custom shelves, stamp overrides, sticker layouts, decorations, guestbook notes, and selected Colourfriction preferences. Backups are versioned and validated before restore; the import attempts to roll back local storage if a write fails.
-- Stamp Workshop supports an optional personal review (up to 180 characters) and a 0–5 personal rating per stamp. Reviews and ratings appear below the artwork and are included in backups.
-- Backups are files saved to your computer. They are not uploaded anywhere. Treat them as personal data because they may contain your profile text and uploaded image data.
+The project is organized into a React frontend and a separate backend directory.
 
+```text
+Colourfriction/
+│
+├── public/
+│   └── Static assets
+│
+├── src/
+│   ├── App.tsx
+│   ├── main.tsx
+│   ├── MediaStamps.tsx
+│   ├── PersonalHomepage.tsx
+│   ├── ProfileEditor.tsx
+│   └── styles.css
+│
+├── server/
+│   ├── package.json
+│   ├── .env
+│   └── Backend source files
+│
+├── .gitignore
+├── index.html
+├── package.json
+├── package-lock.json
+├── tsconfig.json
+├── vite.config.ts
+└── README.md
+```
 
-## Phase 2.10 refinements
+*The `server` directory is being developed. Its final structure may change as backend functionality is implemented.*
 
-- Sticker Studio now offers optional alignment guides and snap-to-5%-grid placement. These editor toggles are temporary UI settings; sticker coordinates remain saved in browser storage.
-- Custom text stickers support arrow-key nudging (hold Shift for larger steps), as do emoji stickers.
-- Custom media shelves support compressed cover-image uploads as well as direct image URLs, a live cover preview, and removing a cover.
-- Individual custom shelves can be exported as JSON, including the shelf definition and matching saved stamp overrides. Shelf export is a backup artifact; importing a single shelf is not yet implemented.
-- Uploaded shelf covers remain in browser local storage. Large or numerous images can still hit browser storage quotas; keep a full profile backup.
+---
 
+## 🗄️ Database and Backend
 
-### Phase 2.11 — shelf restore and storage safety
-- Custom shelves can now be imported from a Phase 2.10+ individual shelf JSON export using the upload arrow in a custom shelf header.
-- Shelf import validates the app/version and required fields, limits imported items to 12, sanitises text lengths, and merges included artwork overrides.
-- Saving the profile and custom shelves now rolls back the previous values if a write fails, reducing the chance of a partially saved profile. Quota errors show a specific message about uploaded covers and browser storage.
-- All profile, shelf, and artwork data remains local to the browser; individual shelf import/export does not sync data to other devices.
+Colourfriction is transitioning from a primarily browser-based application toward a full-stack platform.
+
+The planned architecture is:
+
+```text
+┌───────────────────────────────┐
+│       React + TypeScript      │
+│          Frontend             │
+└───────────────┬───────────────┘
+                │
+                │ HTTP API Requests
+                ▼
+┌───────────────────────────────┐
+│       Node.js + Express       │
+│          Backend API          │
+└───────────────┬───────────────┘
+                │
+                │ PostgreSQL Queries
+                ▼
+┌───────────────────────────────┐
+│       Neon PostgreSQL         │
+│        Hosted Database        │
+└───────────────────────────────┘
+```
+
+The backend will eventually manage:
+
+- User registration and authentication.
+- Persistent user profiles.
+- Custom homepage configurations.
+- Media collections and shelves.
+- Media reviews and ratings.
+- Stickers and decorative elements.
+- Guestbook entries.
+- User-specific application data.
+
+The exact database schema and API endpoints will be defined during backend development.
+
+### Database Security
+
+Database credentials must remain on the backend.
+
+- Store the Neon connection string in `server/.env`.
+- Never expose database credentials in React components or frontend environment variables.
+- Never commit `.env` files to GitHub.
+- Validate incoming API requests.
+- Protect user-specific operations with appropriate authentication and authorization.
+
+---
+
+## 💾 Current Data Storage
+
+The current frontend uses browser-based storage for supported personal data and customizations.
+
+This means that, until the backend migration is implemented, data may be specific to the browser and device where it was created.
+
+A hosted PostgreSQL database is being introduced to support persistent, account-based data in future versions.
+
+**Important:** A hosted database alone does not provide user accounts or automatic synchronization. Those features require the backend and authentication system to be implemented.
+
+---
+
+## 🗺️ Development Roadmap
+
+### Phase 1 — Frontend Foundation
+- Establish the React and TypeScript application.
+- Build the initial Colourfriction interface.
+- Introduce entertainment collections and personal homepage functionality.
+
+### Phase 2 — Personalization and Media Collections
+- Develop the Profile Lab.
+- Implement media artwork and stamp customization.
+- Add reviews, ratings, and favorites.
+- Build custom shelves.
+- Create sticker customization tools.
+- Add backup, restore, and shelf import/export functionality.
+- Improve editor usability and storage error handling.
+
+### Phase 3 — Backend and Database
+- Configure hosted PostgreSQL through Neon.
+- Build the Node.js and Express API.
+- Connect the backend to PostgreSQL.
+- Design the relational database schema.
+- Implement account registration and authentication.
+- Migrate supported browser-based data into persistent user accounts.
+
+### Phase 4 — Full-Stack Integration
+- Connect the frontend to the backend API.
+- Load and save user profiles through PostgreSQL.
+- Persist collections, reviews, and customizations.
+- Introduce user-specific data access and authorization.
+- Test API integration and error handling.
+
+### Phase 5 — Deployment and Refinement
+- Deploy the frontend and backend.
+- Configure production environment variables.
+- Harden authentication and database access.
+- Test the complete application.
+- Improve accessibility, responsiveness, and performance.
+
+*Roadmap items describe planned work and are not necessarily implemented yet.*
+
+---
+
+## 🎯 Project Goals
+
+Colourfriction aims to:
+
+- Bring back the individuality of early personal websites.
+- Encourage creative self-expression online.
+- Make entertainment collections personal and enjoyable.
+- Give users greater control over their digital spaces.
+- Combine nostalgic web aesthetics with modern full-stack technology.
+- Create an extensible foundation for future social features.
+
+---
+
+## 🤝 Contributing
+
+Contributions, suggestions, and creative ideas are welcome.
+
+If you want to contribute:
+
+1. Fork the repository.
+2. Create a feature branch.
+3. Make your changes.
+4. Test your implementation.
+5. Submit a pull request describing your changes.
+
+Please keep the application's distinctive visual identity and focus on personal expression in mind when proposing new features.
+
+---
+
+## 📌 Project Status
+
+**Current focus:** Completing the frontend personalization experience and establishing the hosted PostgreSQL backend.
+
+The frontend has passed a production build check and has been tested manually in the browser. Backend development and database integration are in progress.
+
+---
+
+## 📄 License
+
+A license has not yet been specified. Until one is added to the repository, do not assume the project is available for unrestricted reuse or redistribution.
+
+---
+
+**Colourfriction — Make the internet yours again.** 💿
