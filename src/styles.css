@@ -258,3 +258,34 @@ body{background-color:#d9d1e9;background-image:radial-gradient(#6d3bc455 1px,tra
 .custom-shelf-items>span[draggable=true]{cursor:grab;touch-action:pan-y}
 .custom-shelf-items>span.shelf-item-dragging{opacity:.45;outline:2px dashed #8c5bd6}
 .custom-shelf-items .custom-shelf-item-title{min-width:0;overflow-wrap:anywhere}
+
+/* Phase 2.9: safer profile backups and more expressive media stamps */
+.profile-save-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap}
+.profile-backup-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 11px;border:2px solid #211b2d;background:#fffaf0;color:#211b2d;box-shadow:2px 2px 0 #211b2d;font:8px 'Silkscreen',monospace;cursor:pointer}
+.profile-backup-button:hover{background:#ffdf70;transform:translateY(-1px)}
+.profile-backup-file-input{display:none}
+.stamp-editor-fields textarea{width:100%;min-width:0;resize:vertical;padding:10px;border:1px solid #b7a9c9;border-radius:0;color:#211b2d;background:#fffdf6;font:16px 'VT323',monospace;letter-spacing:normal}
+.stamp-personal-rating{display:grid;gap:5px;font:9px 'Silkscreen',monospace;color:#4b4057}
+.stamp-personal-rating span{font:15px 'VT323',monospace;color:#8c5bd6}
+.stamp-personal-rating input{width:100%;accent-color:#8c5bd6}
+.media-stamp-rating{color:#a76b00!important;letter-spacing:1px;font-size:11px!important}
+.media-stamp-personal-note{display:-webkit-box!important;max-width:100%;overflow:hidden;color:#59416f!important;font:italic 14px/1.1 'VT323',monospace!important;white-space:normal!important;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+@media(max-width:620px){.profile-save-row{align-items:stretch;flex-direction:column}.profile-save-actions{justify-content:stretch}.profile-save-actions>button{flex:1;min-width:0}.media-stamp-personal-note{font-size:12px!important}}
+
+
+/* Phase 2.10 refinement: alignment guides, snap-to-grid and shelf cover tools */
+.sticker-toggle-control{display:inline-flex;align-items:center;gap:6px;padding:7px 9px;background:#f0e9ff;border:1px dashed #8c5bd6;font:8px/1.4 'Silkscreen',monospace;color:#211b2d;cursor:pointer}
+.sticker-toggle-control input{accent-color:#8c5bd6}
+.personal-home-sheet{position:relative}
+.sticker-placement-guides{position:absolute;inset:0;z-index:29;pointer-events:none;opacity:.62;background-image:linear-gradient(to right,rgba(109,59,196,.2) 1px,transparent 1px),linear-gradient(to bottom,rgba(109,59,196,.2) 1px,transparent 1px);background-size:5% 5%;border:2px dashed #8c5bd6}
+.sticker-placement-guides span{position:absolute;top:4px;padding:2px 4px;background:#fff4d9;border:1px solid #211b2d;font:8px 'Silkscreen',monospace;color:#211b2d}
+.sticker-placement-guides span:nth-child(1){left:0}.sticker-placement-guides span:nth-child(2){left:25%}.sticker-placement-guides span:nth-child(3){left:50%}.sticker-placement-guides span:nth-child(4){left:75%}.sticker-placement-guides span:nth-child(5){right:0}
+.personal-home-sheet.show-sticker-guides .personal-home-stickers{outline:1px dashed rgba(109,59,196,.45);outline-offset:-4px}
+.custom-shelf-upload-field{display:grid;gap:6px;margin:9px 0;padding:9px;background:#f0e9ff;border:1px dashed #8c5bd6;font:8px/1.6 'Silkscreen',monospace;color:#4b4057}
+.custom-shelf-upload-field input[type=file]{width:100%;min-width:0;font:13px 'VT323',monospace;color:#211b2d}
+.custom-shelf-cover-preview{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;margin:8px 0;padding:8px;background:#fff4d9;border:1px dashed #b7a2d0}
+.custom-shelf-cover-preview img{width:100%;max-height:120px;object-fit:cover;border:2px solid #211b2d}
+.custom-shelf-cover-preview button{padding:7px;background:#ffb7ca;border:1px solid #211b2d;font:8px 'Silkscreen',monospace;color:#211b2d;cursor:pointer}
+.custom-shelf-header-actions button:nth-child(3){background:#ffdf70}
+@media(max-width:520px){.custom-shelf-cover-preview{grid-template-columns:1fr}.custom-shelf-cover-preview button{min-height:34px}.sticker-toggle-control{width:100%}}
+@media(prefers-reduced-motion:reduce){.sticker-placement-guides{scroll-behavior:auto}}

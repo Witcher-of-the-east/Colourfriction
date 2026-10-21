@@ -3,7 +3,7 @@ import { ImagePlus, Pencil, RotateCcw, Save, X } from 'lucide-react'
 
 type MediaKind = 'movies' | 'games' | 'music' | 'books'
 type Props = { title: string; kind: MediaKind; compact?: boolean }
-type StampOverride = { title?: string; image?: string }
+type StampOverride = { title?: string; image?: string; note?: string; rating?: number }
 type StampOverrides = Record<string, StampOverride>
 type ArtworkOption = { title: string; image: string; detail?: string }
 const OVERRIDE_KEY = 'colourfriction-media-stamps-v1'
@@ -138,6 +138,8 @@ export function MediaStamp({ title, kind, compact = false }: Props) {
   const [editing, setEditing] = useState(false)
   const [draftTitle, setDraftTitle] = useState(override.title || title)
   const [draftImage, setDraftImage] = useState(override.image || '')
+  const [draftNote, setDraftNote] = useState(override.note || '')
+  const [draftRating, setDraftRating] = useState(override.rating || 0)
   const [message, setMessage] = useState('Paste an image URL or upload your own cover.')
   const [artworkOptions, setArtworkOptions] = useState<ArtworkOption[]>([])
   const [searchingArtwork, setSearchingArtwork] = useState(false)
@@ -163,6 +165,8 @@ export function MediaStamp({ title, kind, compact = false }: Props) {
     setOverrides(readOverrides())
     setDraftTitle(current.title || title)
     setDraftImage(current.image || '')
+    setDraftNote(current.note || '')
+    setDraftRating(current.rating || 0)
     setMessage('Paste an image URL or upload your own cover.')
     setArtworkOptions([])
     setEditing(true)
@@ -207,8 +211,15 @@ export function MediaStamp({ title, kind, compact = false }: Props) {
     const next = { ...readOverrides() }
     const cleanedTitle = draftTitle.trim().slice(0, 100)
     const cleanedImage = draftImage.trim()
-    if (cleanedTitle === title && !cleanedImage) delete next[key]
-    else next[key] = { ...(cleanedTitle && cleanedTitle !== title ? { title: cleanedTitle } : {}), ...(cleanedImage ? { image: cleanedImage } : {}) }
+    const cleanedNote = draftNote.trim().slice(0, 180)
+    const cleanedRating = Math.max(0, Math.min(5, Math.round(draftRating)))
+    if (cleanedTitle === title && !cleanedImage && !cleanedNote && cleanedRating === 0) delete next[key]
+    else next[key] = {
+      ...(cleanedTitle && cleanedTitle !== title ? { title: cleanedTitle } : {}),
+      ...(cleanedImage ? { image: cleanedImage } : {}),
+      ...(cleanedNote ? { note: cleanedNote } : {}),
+      ...(cleanedRating ? { rating: cleanedRating } : {}),
+    }
     if (!writeOverrides(next)) { setMessage('Browser storage is full. Try a smaller image.'); return }
     setOverrides(next)
     setImageFailed(false)
@@ -222,6 +233,8 @@ export function MediaStamp({ title, kind, compact = false }: Props) {
     setImageFailed(false)
     setDraftTitle(title)
     setDraftImage('')
+    setDraftNote('')
+    setDraftRating(0)
     setEditing(false)
   }
 
@@ -234,7 +247,7 @@ export function MediaStamp({ title, kind, compact = false }: Props) {
           <span className="media-stamp-kind">{kindLabels[kind]}</span><span className="media-stamp-corner">✳</span>
           <span className="media-stamp-edit-hint"><Pencil size={12} /> EDIT STAMP</span>
         </div>
-        <div className="media-stamp-caption"><span>{shownTitle}</span><small>{override.image ? 'CUSTOM COVER ✿' : 'IN MY COLLECTION'}</small></div>
+        <div className="media-stamp-caption"><span>{shownTitle}</span>{(override.rating || 0) > 0 && <small className="media-stamp-rating" aria-label={`Personal rating ${override.rating} out of 5`}>{'★'.repeat(override.rating || 0)}{'☆'.repeat(5 - (override.rating || 0))}</small>}{override.note && <small className="media-stamp-personal-note">“{override.note}”</small>}<small>{override.image ? 'CUSTOM COVER ✿' : 'IN MY COLLECTION'}</small></div>
       </button>
     </article>
     {editing && <div className="stamp-editor-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditing(false) }}>
@@ -245,6 +258,8 @@ export function MediaStamp({ title, kind, compact = false }: Props) {
           <div className="stamp-editor-fields">
             <label>STAMP TITLE<input value={draftTitle} maxLength={100} onChange={(event) => setDraftTitle(event.target.value)} placeholder="Title shown under the stamp" /></label>
             <label>COVER IMAGE URL<input value={draftImage.startsWith('data:') ? '' : draftImage} onChange={(event) => setDraftImage(event.target.value)} placeholder="https://…" /></label>
+            <label>MY LITTLE REVIEW <textarea value={draftNote} maxLength={180} rows={3} onChange={(event) => setDraftNote(event.target.value)} placeholder="Why does this one live in your head? (optional)" /></label>
+            <label className="stamp-personal-rating">PERSONAL RATING <span>{draftRating ? `${draftRating}/5 stars` : 'not rated yet'}</span><input type="range" min="0" max="5" step="1" value={draftRating} onChange={(event) => setDraftRating(Number(event.target.value))} /></label>
             <button type="button" className="stamp-find-art-button" onClick={searchArtwork} disabled={searchingArtwork || !draftTitle.trim()}>{searchingArtwork ? 'SEARCHING CATALOGUES…' : '↻ FIND COVER OPTIONS'}</button>
             {artworkOptions.length > 0 && <div className="stamp-artwork-options" aria-label="Cover choices">{artworkOptions.map((option, index) => <button type="button" key={`${option.image}-${index}`} className={draftImage === option.image ? 'chosen' : ''} onClick={() => { setDraftImage(option.image); setMessage(`Selected artwork: ${option.title}`) }} title={`${option.title}${option.detail ? ` — ${option.detail}` : ''}`}><img src={option.image} alt={option.title} loading="lazy"/><span>{option.title}</span><small>{option.detail}</small></button>)}</div>}
             <label className="stamp-upload-button"><ImagePlus size={15} /> UPLOAD YOUR OWN IMAGE<input type="file" accept="image/*" onChange={uploadImage} /></label>

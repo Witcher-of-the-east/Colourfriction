@@ -1,11 +1,44 @@
-import { useMemo, useState } from 'react'
-import { ArrowLeft, Check, Eye, RotateCcw, Save, Sparkles, ExternalLink } from 'lucide-react'
+import { useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { ArrowLeft, Check, Eye, RotateCcw, Save, Sparkles, ExternalLink, Download, Upload } from 'lucide-react'
 import { MediaStampGrid, saveMediaArtwork, searchMediaCatalogue, type MediaSearchResult } from './MediaStamps'
 
 type MediaKind = 'movies' | 'games' | 'music' | 'books'
 type CustomShelf = { id: string; name: string; kind: MediaKind; items: string[]; description?: string; rating?: number; icon?: string; cover?: string }
 const CUSTOM_SHELVES_KEY = 'colourfriction-custom-shelves-v1'
+const BACKUP_KEYS = [
+  'colourfriction-profile-v1', CUSTOM_SHELVES_KEY, 'colourfriction-media-stamps-v1',
+  'colourfriction-sticker-positions-v1', 'colourfriction-decorations-v1',
+  'colourfriction-custom-text-stickers-v1', 'colourfriction:my-page-notes',
+  'colourfriction:theme', 'colourfriction:sparkle-cursor', 'colourfriction:favourites',
+  'colourfriction:guestbook', 'colourfriction:tiny-quest',
+]
 function readCustomShelves(): CustomShelf[] { try { const value = JSON.parse(localStorage.getItem(CUSTOM_SHELVES_KEY) || '[]'); return Array.isArray(value) ? value.slice(0, 12) : [] } catch { return [] } }
+
+async function compressShelfCover(file: File): Promise<string> {
+  if (!file.type.startsWith('image/')) throw new Error('Choose an image file.');
+  if (file.size > 5 * 1024 * 1024) throw new Error('Choose an image smaller than 5 MB.');
+  const source = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not read that image.'));
+    reader.onerror = () => reject(new Error('Could not read that image.'));
+    reader.readAsDataURL(file);
+  });
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const element = new Image();
+    element.onload = () => resolve(element);
+    element.onerror = () => reject(new Error('That image could not be opened.'));
+    element.src = source;
+  });
+  const maxWidth = 1200, maxHeight = 500;
+  const scale = Math.min(1, maxWidth / image.width, maxHeight / image.height);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Could not process that image.');
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.78);
+}
 
 type Profile = {
   displayName: string
@@ -77,6 +110,9 @@ export default function ProfileEditor({ onBack, onVisit }: { onBack: () => void;
   const [customShelfSearchResults, setCustomShelfSearchResults] = useState<Record<string, MediaSearchResult[]>>({})
   const [searchingShelf, setSearchingShelf] = useState<string | null>(null)
   const [draggedShelfItem, setDraggedShelfItem] = useState<{ shelfId: string; index: number } | null>(null)
+  const [stampRefresh, setStampRefresh] = useState(0)
+  const backupInput = useRef<HTMLInputElement>(null)
+  const shelfImportInput = useRef<HTMLInputElement>(null)
 
   const update = <K extends keyof Profile>(key: K, value: Profile[K]) => {
     setSaved(false)
@@ -102,6 +138,82 @@ export default function ProfileEditor({ onBack, onVisit }: { onBack: () => void;
     try { localStorage.removeItem('colourfriction-profile-v1'); localStorage.removeItem(CUSTOM_SHELVES_KEY) } catch { /* storage may be unavailable */ }
     setCustomShelves([])
     setNotice('Starter profile restored. Save if you want to keep these defaults.')
+  }
+
+  const exportBackup = () => {
+    try {
+      const data: Record<string, string> = {}
+      BACKUP_KEYS.forEach((key) => {
+        const value = localStorage.getItem(key)
+        if (value !== null) data[key] = value
+      })
+      // Include the current editor state, even if the user has not pressed Save yet.
+      data['colourfriction-profile-v1'] = JSON.stringify(profile)
+      data[CUSTOM_SHELVES_KEY] = JSON.stringify(customShelves)
+      const backup = { app: 'colourfriction', formatVersion: 1, exportedAt: new Date().toISOString(), data }
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `colourfriction-backup-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setNotice('Backup downloaded. Keep that JSON file somewhere safe; it can restore your local page later.')
+    } catch {
+      setNotice('Could not create a backup in this browser. Try saving your profile first.')
+    }
+  }
+
+  const importBackup = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (file.size > 25 * 1024 * 1024) { setNotice('That backup is larger than 25 MB. Choose a smaller backup file.'); return }
+    try {
+      const parsed = JSON.parse(await file.text()) as { app?: unknown; formatVersion?: unknown; data?: unknown }
+      if (parsed.app !== 'colourfriction' || parsed.formatVersion !== 1 || !parsed.data || typeof parsed.data !== 'object' || Array.isArray(parsed.data)) {
+        setNotice('This does not look like a supported Colourfriction backup. Nothing was changed.')
+        return
+      }
+      const source = parsed.data as Record<string, unknown>
+      const entries: [string, string][] = Object.entries(source).filter((entry): entry is [string, string] => BACKUP_KEYS.includes(entry[0]) && typeof entry[1] === 'string')
+      if (!entries.some(([key]) => key === 'colourfriction-profile-v1')) {
+        setNotice('This backup has no profile data. Nothing was changed.')
+        return
+      }
+      // Validate the core records before touching existing browser data.
+      const importedProfile = JSON.parse(source['colourfriction-profile-v1'] as string)
+      if (!importedProfile || typeof importedProfile !== 'object' || Array.isArray(importedProfile)) {
+        setNotice('The profile data in this backup is invalid. Nothing was changed.')
+        return
+      }
+      const shelvesRaw = source[CUSTOM_SHELVES_KEY]
+      const importedShelves = typeof shelvesRaw === 'string' ? JSON.parse(shelvesRaw) : []
+      if (!Array.isArray(importedShelves)) { setNotice('The shelf data in this backup is invalid. Nothing was changed.'); return }
+      const incoming = new Map(entries)
+      const previous = new Map<string, string | null>()
+      try {
+        BACKUP_KEYS.forEach((key) => previous.set(key, localStorage.getItem(key)))
+        // Restore is a replacement, not a merge: remove stale app keys omitted by this backup.
+        BACKUP_KEYS.forEach((key) => {
+          const value = incoming.get(key)
+          if (value === undefined) localStorage.removeItem(key)
+          else localStorage.setItem(key, value)
+        })
+      } catch (error) {
+        previous.forEach((value, key) => { try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value) } catch { /* best-effort rollback */ } })
+        throw error
+      }
+      setProfile({ ...starterProfile, ...importedProfile })
+      setCustomShelves(importedShelves.slice(0, 12))
+      setStampRefresh((value) => value + 1)
+      setSaved(true)
+      setNotice(`Restored ${entries.length} saved Colourfriction records from ${file.name}. Check your page, then save if you make changes.`)
+    } catch {
+      setNotice('Could not read that backup. It may be damaged or browser storage may be full; existing data was preserved where possible.')
+    }
   }
 
   const toggleBadge = (badge: string) => {
@@ -160,6 +272,96 @@ export default function ProfileEditor({ onBack, onVisit }: { onBack: () => void;
   const updateCustomShelf = (id: string, changes: Partial<CustomShelf>) => {
     setSaved(false)
     setCustomShelves((items) => items.map((shelf) => shelf.id === id ? { ...shelf, ...changes } : shelf))
+  }
+  const uploadShelfCover = async (id: string, event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    try {
+      const cover = await compressShelfCover(file)
+      updateCustomShelf(id, { cover })
+      setNotice(`Shelf cover added from ${file.name}. Save your page to keep it.`)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Could not process that cover.')
+    }
+  }
+  const importShelf = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (file.size > 10 * 1024 * 1024) { setNotice('That shelf file is larger than 10 MB. Choose a smaller JSON file.'); return }
+    try {
+      const parsed = JSON.parse(await file.text()) as { app?: unknown; formatVersion?: unknown; shelf?: unknown; stampOverrides?: unknown }
+      if (parsed.app !== 'colourfriction-shelf' || parsed.formatVersion !== 1 || !parsed.shelf || typeof parsed.shelf !== 'object' || Array.isArray(parsed.shelf)) {
+        setNotice('This is not a supported Colourfriction shelf file. Nothing was changed.')
+        return
+      }
+      const raw = parsed.shelf as Record<string, unknown>
+      const kinds: MediaKind[] = ['movies', 'games', 'music', 'books']
+      if (typeof raw.name !== 'string' || !raw.name.trim() || !kinds.includes(raw.kind as MediaKind) || !Array.isArray(raw.items)) {
+        setNotice('The shelf file is missing a valid name, media type, or item list. Nothing was changed.')
+        return
+      }
+      const name = raw.name.trim().slice(0, 42)
+      const items = raw.items.filter((item): item is string => typeof item === 'string' && !!item.trim()).map((item) => item.trim().slice(0, 100)).filter((item, index, all) => all.findIndex((other) => other.toLowerCase() === item.toLowerCase()) === index).slice(0, 12)
+      if (customShelves.length >= 12) { setNotice('You already have 12 custom shelves. Delete one before importing another.'); return }
+      let importedName = name
+      let suffix = 1
+      while (customShelves.some((item) => item.name.toLowerCase() === importedName.toLowerCase())) {
+        suffix += 1
+        const label = suffix === 2 ? ' (imported)' : ` (imported ${suffix - 1})`
+        importedName = `${name.slice(0, Math.max(1, 42 - label.length))}${label}`
+      }
+      const shelf: CustomShelf = {
+        id: `shelf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name: importedName,
+        kind: raw.kind as MediaKind,
+        items,
+        description: typeof raw.description === 'string' ? raw.description.slice(0, 120) : '',
+        rating: typeof raw.rating === 'number' && Number.isFinite(raw.rating) ? Math.max(0, Math.min(5, Math.round(raw.rating))) : 0,
+        icon: typeof raw.icon === 'string' ? raw.icon.slice(0, 12) : undefined,
+        cover: typeof raw.cover === 'string' && (raw.cover.startsWith('https://') || raw.cover.startsWith('http://') || raw.cover.startsWith('data:image/')) ? raw.cover : '',
+      }
+      const overrides = parsed.stampOverrides && typeof parsed.stampOverrides === 'object' && !Array.isArray(parsed.stampOverrides) ? parsed.stampOverrides as Record<string, unknown> : {}
+      const oldOverridesRaw = localStorage.getItem('colourfriction-media-stamps-v1') || '{}'
+      const oldOverrides = JSON.parse(oldOverridesRaw) as Record<string, unknown>
+      const mergedOverrides = { ...oldOverrides }
+      Object.entries(overrides).forEach(([key, value]) => {
+        if (key.length < 220 && value && typeof value === 'object' && !Array.isArray(value)) mergedOverrides[key] = value
+      })
+      let overridesSaved = true
+      try {
+        localStorage.setItem('colourfriction-media-stamps-v1', JSON.stringify(mergedOverrides))
+      } catch {
+        overridesSaved = false
+      }
+      setCustomShelves((current) => [...current, shelf].slice(0, 12))
+      setSaved(false)
+      setStampRefresh((value) => value + 1)
+      setNotice(overridesSaved
+        ? `Imported “${shelf.name}” with ${items.length} item${items.length === 1 ? '' : 's'}. Press SAVE MY PAGE to keep the shelf in this browser.`
+        : `Imported “${shelf.name}”, but artwork overrides could not fit in browser storage. Remove large covers and try again if you need them.`)
+    } catch {
+      setNotice('Could not read that shelf file. It may be damaged or browser storage may be full; your shelf list was not changed.')
+    }
+  }
+
+  const exportShelf = (shelf: CustomShelf) => {
+    try {
+      const allOverrides = JSON.parse(localStorage.getItem('colourfriction-media-stamps-v1') || '{}') as Record<string, unknown>
+      const stampOverrides: Record<string, unknown> = {}
+      shelf.items.forEach((title) => {
+        const key = `${shelf.kind}:${title.trim().toLowerCase()}`
+        if (allOverrides[key]) stampOverrides[key] = allOverrides[key]
+      })
+      const payload = { app: 'colourfriction-shelf', formatVersion: 1, exportedAt: new Date().toISOString(), shelf, stampOverrides }
+      const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `colourfriction-shelf-${shelf.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'collection'}.json`
+      document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setNotice(`Exported “${shelf.name}” as a shelf backup. Keep the JSON file somewhere safe.`)
+    } catch { setNotice('Could not export this shelf in the current browser.') }
   }
   const moveCustomShelf = (id: string, direction: -1 | 1) => {
     setSaved(false)
@@ -291,13 +493,13 @@ export default function ProfileEditor({ onBack, onVisit }: { onBack: () => void;
               <p className="collection-editor-note">Create shelves with names like “comfort films”, “games that broke me”, or “books for rainy days”. Each shelf can hold up to 12 stamps.</p>
               <div className="custom-shelf-create-row"><input value={newShelfName} maxLength={42} onChange={(event) => setNewShelfName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); createCustomShelf() } }} placeholder="e.g. films that live rent-free"/><select value={newShelfKind} onChange={(event) => setNewShelfKind(event.target.value as MediaKind)} aria-label="Media type for new shelf"><option value="movies">Movies</option><option value="games">Games</option><option value="music">Music</option><option value="books">Books</option></select><button type="button" onClick={createCustomShelf} disabled={!newShelfName.trim() || customShelves.length >= 12}>+ CREATE SHELF</button></div>
               {customShelves.map((shelf) => <section className="custom-shelf-edit-card" key={shelf.id}>
-                <header><span>{shelf.icon || ({ movies: '🎬', games: '🎮', music: '🎧', books: '📚' } as Record<MediaKind, string>)[shelf.kind]} {shelf.name}</span><div className="custom-shelf-header-actions"><button type="button" onClick={() => moveCustomShelf(shelf.id, -1)} disabled={customShelves[0]?.id === shelf.id} aria-label={`Move ${shelf.name} shelf earlier`}>↑</button><button type="button" onClick={() => moveCustomShelf(shelf.id, 1)} disabled={customShelves[customShelves.length - 1]?.id === shelf.id} aria-label={`Move ${shelf.name} shelf later`}>↓</button><button type="button" onClick={() => { setSaved(false); setCustomShelves((items) => items.filter((item) => item.id !== shelf.id)) }} aria-label={`Delete ${shelf.name} shelf`}>×</button></div></header>
+                <header><span>{shelf.icon || ({ movies: '🎬', games: '🎮', music: '🎧', books: '📚' } as Record<MediaKind, string>)[shelf.kind]} {shelf.name}</span><div className="custom-shelf-header-actions"><button type="button" onClick={() => moveCustomShelf(shelf.id, -1)} disabled={customShelves[0]?.id === shelf.id} aria-label={`Move ${shelf.name} shelf earlier`}>↑</button><button type="button" onClick={() => moveCustomShelf(shelf.id, 1)} disabled={customShelves[customShelves.length - 1]?.id === shelf.id} aria-label={`Move ${shelf.name} shelf later`}>↓</button><button type="button" onClick={() => exportShelf(shelf)} aria-label={`Export ${shelf.name} shelf`} title="Export this shelf as JSON">⇩</button><button type="button" onClick={() => shelfImportInput.current?.click()} aria-label="Import a shelf backup" title="Import a shelf JSON backup">⇧</button><button type="button" onClick={() => { setSaved(false); setCustomShelves((items) => items.filter((item) => item.id !== shelf.id)) }} aria-label={`Delete ${shelf.name} shelf`}>×</button></div></header>
                 <small>{shelf.items.length}/12 · {shelf.kind.toUpperCase()} · CUSTOMISE THIS SHELF</small>
                 <div className="custom-shelf-meta-grid"><label>SHELF NAME<input value={shelf.name} maxLength={42} onChange={(event) => updateCustomShelf(shelf.id, { name: event.target.value.slice(0, 42) })}/></label><label>ICON<select value={shelf.icon || ({ movies: '🎬', games: '🎮', music: '🎧', books: '📚' } as Record<MediaKind, string>)[shelf.kind]} onChange={(event) => updateCustomShelf(shelf.id, { icon: event.target.value })}>{['🎬','🎮','🎧','📚','🍓','🌙','🪼','🦋','💿','🌱','🧸','🪐'].map((icon) => <option key={icon} value={icon}>{icon}</option>)}</select></label></div>
                 <label className="custom-shelf-description">SHELF DESCRIPTION<textarea value={shelf.description || ''} maxLength={120} rows={2} onChange={(event) => updateCustomShelf(shelf.id, { description: event.target.value })} placeholder="Why do these titles belong together?"/></label>
-                <label className="custom-shelf-cover-field">SHELF COVER IMAGE URL<input type="url" value={shelf.cover || ''} maxLength={600} onChange={(event) => updateCustomShelf(shelf.id, { cover: event.target.value })} placeholder="https://… (optional)"/><small>Use a direct image link. Leave blank for the handmade paper look.</small></label>
+                <label className="custom-shelf-cover-field">SHELF COVER IMAGE URL<input type="url" value={(shelf.cover || '').startsWith('data:') ? '' : shelf.cover || ''} maxLength={600} onChange={(event) => updateCustomShelf(shelf.id, { cover: event.target.value })} placeholder="https://… (optional)"/><small>Use a direct image link or upload a cover below. Images are compressed for browser storage.</small></label><label className="custom-shelf-upload-field">UPLOAD A SHELF COVER<input type="file" accept="image/*" onChange={(event) => uploadShelfCover(shelf.id, event)}/></label>{shelf.cover && <div className="custom-shelf-cover-preview"><img src={shelf.cover} alt={`Preview of ${shelf.name} cover`} onError={(event) => { event.currentTarget.style.display = 'none' }}/><button type="button" onClick={() => updateCustomShelf(shelf.id, { cover: '' })}>REMOVE COVER</button></div>}
                 <label className="custom-shelf-rating">PERSONAL VIBE RATING <span>{shelf.rating || 0}/5 ✦</span><input type="range" min="0" max="5" step="1" value={shelf.rating || 0} onChange={(event) => updateCustomShelf(shelf.id, { rating: Number(event.target.value) })}/><small>Optional, just your own rating of this collection.</small></label>
-                <div className="custom-shelf-items" aria-label={`Reorder items in ${shelf.name}`}>{shelf.items.map((item, index) => <span key={`${item}-${index}`} draggable onDragStart={(event) => { setDraggedShelfItem({ shelfId: shelf.id, index }); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', item) }} onDragOver={(event) => { if (draggedShelfItem?.shelfId === shelf.id) event.preventDefault() }} onDrop={(event) => { event.preventDefault(); if (draggedShelfItem?.shelfId === shelf.id) reorderCustomShelfItem(shelf.id, draggedShelfItem.index, index); setDraggedShelfItem(null) }} onDragEnd={() => setDraggedShelfItem(null)} className={draggedShelfItem?.shelfId === shelf.id && draggedShelfItem.index === index ? 'shelf-item-dragging' : ''}><b>{String(index + 1).padStart(2, '0')}</b><span className="custom-shelf-item-title">{item}</span><button type="button" disabled={index === 0} onClick={() => moveCustomShelfItem(shelf.id, index, -1)} aria-label={`Move ${item} earlier`}>↑</button><button type="button" disabled={index === shelf.items.length - 1} onClick={() => moveCustomShelfItem(shelf.id, index, 1)} aria-label={`Move ${item} later`}>↓</button><button type="button" onClick={() => { setSaved(false); updateCustomShelf(shelf.id, { items: shelf.items.filter((value, itemIndex) => itemIndex !== index) }) }} aria-label={`Remove ${item} from ${shelf.name}`}>×</button></span>)}</div>
+                <div className="custom-shelf-items" aria-label={`Reorder items in ${shelf.name}`}>{shelf.items.map((item, index) => <span key={`${item}-${index}`} draggable onDragStart={(event) => { setDraggedShelfItem({ shelfId: shelf.id, index }); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', item) }} onDragOver={(event) => { if (draggedShelfItem?.shelfId === shelf.id) event.preventDefault() }} onDrop={(event) => { event.preventDefault(); if (draggedShelfItem?.shelfId === shelf.id) reorderCustomShelfItem(shelf.id, draggedShelfItem.index, index); setDraggedShelfItem(null) }} onDragEnd={() => setDraggedShelfItem(null)} className={draggedShelfItem?.shelfId === shelf.id && draggedShelfItem.index === index ? 'shelf-item-dragging' : ''}><b>{String(index + 1).padStart(2, '0')}</b><span className="custom-shelf-item-title">{item}</span><button type="button" disabled={index === 0} onClick={() => moveCustomShelfItem(shelf.id, index, -1)} aria-label={`Move ${item} earlier`}>↑</button><button type="button" disabled={index === shelf.items.length - 1} onClick={() => moveCustomShelfItem(shelf.id, index, 1)} aria-label={`Move ${item} later`}>↓</button><button type="button" onClick={() => { setSaved(false); updateCustomShelf(shelf.id, { items: shelf.items.filter((_, itemIndex) => itemIndex !== index) }) }} aria-label={`Remove ${item} from ${shelf.name}`}>×</button></span>)}</div>
                 <div className="collection-add-row"><input value={customShelfDrafts[shelf.id] || ''} maxLength={100} onChange={(event) => setCustomShelfDrafts((items) => ({ ...items, [shelf.id]: event.target.value }))} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addCustomShelfItem(shelf.id) } }} placeholder="Add a title to this shelf"/><button type="button" onClick={() => addCustomShelfItem(shelf.id)} disabled={!((customShelfDrafts[shelf.id] || '').trim()) || shelf.items.length >= 12}>+ ADD TEXT</button></div>
                 <button type="button" className="catalogue-search-button" onClick={() => searchCustomShelf(shelf)} disabled={searchingShelf === shelf.id || !((customShelfDrafts[shelf.id] || '').trim()) || shelf.items.length >= 12}>{searchingShelf === shelf.id ? 'SEARCHING…' : '⌕ FIND ARTWORK & ADD'}</button>
                 {(customShelfSearchResults[shelf.id] || []).length > 0 && <div className="profile-catalogue-results" aria-label={`${shelf.name} search results`}>{customShelfSearchResults[shelf.id].map((result, index) => <article key={`${result.image}-${index}`}><img src={result.image} alt={`${result.title} artwork`} loading="lazy"/><div><b>{result.title}</b><small>{result.detail || 'Catalogue result'}</small><button type="button" onClick={() => addCustomShelfCatalogueResult(shelf, result)}>+ PIN THIS EDITION</button></div></article>)}</div>}
@@ -305,12 +507,12 @@ export default function ProfileEditor({ onBack, onVisit }: { onBack: () => void;
             </section>
           </div>}
 
-          <div className="profile-save-row"><p className={saved ? 'save-notice success' : 'save-notice'} aria-live="polite">{notice}</p><div><button className="profile-reset-button" onClick={resetProfile}><RotateCcw size={14} /> RESET</button><button className="button-primary" onClick={saveProfile}><Save size={14} /> {saved ? 'SAVED!' : 'SAVE MY PAGE'}</button></div></div>
+          <div className="profile-save-row"><p className={saved ? 'save-notice success' : 'save-notice'} aria-live="polite">{notice}</p><div className="profile-save-actions"><button type="button" className="profile-backup-button" onClick={exportBackup} title="Download a backup of your local profile and customisations"><Download size={14} /> BACK UP</button><button type="button" className="profile-backup-button" onClick={() => backupInput.current?.click()} title="Restore a Colourfriction JSON backup"><Upload size={14} /> RESTORE</button><input ref={backupInput} className="profile-backup-file-input" type="file" accept="application/json,.json" onChange={importBackup} aria-label="Choose a Colourfriction backup file"/><input ref={shelfImportInput} className="profile-backup-file-input" type="file" accept="application/json,.json" onChange={importShelf} aria-label="Choose a Colourfriction shelf backup"/><button className="profile-reset-button" onClick={resetProfile}><RotateCcw size={14} /> RESET</button><button className="button-primary" onClick={saveProfile}><Save size={14} /> {saved ? 'SAVED!' : 'SAVE MY PAGE'}</button></div></div>
         </section>
 
         <section className="profile-preview-column" aria-label="Live profile preview">
           <div className="preview-label"><Eye size={14} /> LIVE PREVIEW <span>CHANGES AS YOU TYPE</span></div>
-          <article className={`personal-profile-preview wallpaper-${profile.wallpaper} profile-font-${profile.font} profile-layout-${profile.layout}`} style={{ '--profile-accent': profile.accent, '--profile-paper': profile.paper } as React.CSSProperties}>
+          <article key={stampRefresh} className={`personal-profile-preview wallpaper-${profile.wallpaper} profile-font-${profile.font} profile-layout-${profile.layout}`} style={{ '--profile-accent': profile.accent, '--profile-paper': profile.paper } as React.CSSProperties}>
             <div className="preview-browser-bar"><span className="browser-dots"><i /><i /><i /></span><span>colourfriction.net/~{profile.username || 'yourname'}</span><span>✳</span></div>
             <div className="preview-profile-header"><div className="preview-avatar">{profile.avatar || '✳'}</div><div className="preview-identity"><span className="preview-online"><i /> ONLINE-ISH</span><h2>{profile.displayName || 'Your name here'}</h2><p>@{profile.username || 'yourname'}</p></div><span className="preview-sticker">WEB<br />PERSON<br />✿</span></div>
             <div className="preview-status"><span>✎ STATUS:</span> {profile.status || 'thinking up a status...'}</div>

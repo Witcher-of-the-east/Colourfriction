@@ -40,3 +40,26 @@ npm run build
 ## Storage and limitations
 
 This remains a front-end prototype. Profile fields, stamp overrides, sticker layout, custom text stickers, named shelves, decorations, and guestbook entries are stored in the current browser's local storage. They are not public, synced, or shared with other devices. Catalogue endpoints may return different results or be unavailable; use the custom URL/upload options if that happens. Local storage has a finite quota, so avoid uploading many large images.
+
+
+## Phase 2.9 refinements
+
+- Profile Lab includes a JSON backup and restore workflow for local profile data, custom shelves, stamp overrides, sticker layouts, decorations, guestbook notes, and selected Colourfriction preferences. Backups are versioned and validated before restore; the import attempts to roll back local storage if a write fails.
+- Stamp Workshop supports an optional personal review (up to 180 characters) and a 0–5 personal rating per stamp. Reviews and ratings appear below the artwork and are included in backups.
+- Backups are files saved to your computer. They are not uploaded anywhere. Treat them as personal data because they may contain your profile text and uploaded image data.
+
+
+## Phase 2.10 refinements
+
+- Sticker Studio now offers optional alignment guides and snap-to-5%-grid placement. These editor toggles are temporary UI settings; sticker coordinates remain saved in browser storage.
+- Custom text stickers support arrow-key nudging (hold Shift for larger steps), as do emoji stickers.
+- Custom media shelves support compressed cover-image uploads as well as direct image URLs, a live cover preview, and removing a cover.
+- Individual custom shelves can be exported as JSON, including the shelf definition and matching saved stamp overrides. Shelf export is a backup artifact; importing a single shelf is not yet implemented.
+- Uploaded shelf covers remain in browser local storage. Large or numerous images can still hit browser storage quotas; keep a full profile backup.
+
+
+### Phase 2.11 — shelf restore and storage safety
+- Custom shelves can now be imported from a Phase 2.10+ individual shelf JSON export using the upload arrow in a custom shelf header.
+- Shelf import validates the app/version and required fields, limits imported items to 12, sanitises text lengths, and merges included artwork overrides.
+- Saving the profile and custom shelves now rolls back the previous values if a write fails, reducing the chance of a partially saved profile. Quota errors show a specific message about uploaded covers and browser storage.
+- All profile, shelf, and artwork data remains local to the browser; individual shelf import/export does not sync data to other devices.
